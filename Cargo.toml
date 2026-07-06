@@ -1,0 +1,24 @@
+[package]
+name = "canonic"
+version = "0.1.0"
+edition = "2021"
+description = "Versioned Jira canned-response corpus: markdown source of truth, pandoc jira convert, Vale/Harper lint, Heed+BM25 search"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/HaoZeke/canonic"
+
+[[bin]]
+name = "canonic"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+heed = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"

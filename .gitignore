@@ -1,0 +1,5 @@
+/target
+**/*.rs.bk
+.canonic-index/
+*.mdb
+.DS_Store
