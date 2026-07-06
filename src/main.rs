@@ -3,6 +3,7 @@
 use anyhow::{bail, Context, Result};
 use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available};
 use canonic::corpus::{default_corpus_dir, walk_responses};
+use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
 use canonic::index::{default_index_dir, reindex, search};
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use clap::{Parser, Subcommand};
@@ -22,6 +23,8 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Report presence of pandoc, Vale, Harper CLI, and in-process harper-core
+    Doctor,
     /// List canned responses in the corpus
     List {
         /// Corpus directory (default: corpus/responses)
@@ -39,7 +42,7 @@ enum Commands {
         #[arg(long)]
         write: bool,
     },
-    /// Lint the corpus with Vale and/or Harper
+    /// Lint the corpus with Vale and/or Harper (harper-core in-process)
     Lint {
         /// Corpus directory (default: corpus/responses)
         #[arg(long)]
@@ -88,6 +91,15 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::Doctor => {
+            let statuses = collect_statuses();
+            print!("{}", format_doctor(&statuses));
+            if critical_missing(&statuses).is_empty() {
+                Ok(ExitCode::SUCCESS)
+            } else {
+                Ok(ExitCode::from(1))
+            }
+        }
         Commands::List { corpus } => {
             let corpus = corpus.unwrap_or_else(default_corpus_dir);
             let docs = walk_responses(&corpus)?;
@@ -162,7 +174,6 @@ fn run() -> Result<ExitCode> {
             } else {
                 print!("{}", format_report(&report));
             }
-            // Exit 0 when only missing tools (explicit report). Exit 1 when findings exist.
             if !report.findings.is_empty() {
                 Ok(ExitCode::from(1))
             } else {

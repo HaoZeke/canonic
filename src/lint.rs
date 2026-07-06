@@ -1,4 +1,4 @@
-//! Vale and Harper lint invocation for the markdown corpus.
+//! Vale and Harper lint for the markdown corpus (CLI + in-process harper-core).
 
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
@@ -8,11 +8,11 @@ use std::process::Command;
 /// Which external (or in-process) lint engine to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum LintEngine {
-    /// Run both Vale and Harper when available.
+    /// Run Vale (if present) and Harper (in-process, plus CLI if present).
     All,
     /// Run only Vale.
     Vale,
-    /// Run only Harper (`harper-cli` / `harper` on PATH).
+    /// Run Harper via in-process `harper-core` (and optional CLI if on PATH).
     Harper,
 }
 
@@ -56,17 +56,17 @@ pub fn binary_available(name: &str) -> bool {
     for flag in ["--version", "--help", "version"] {
         if let Ok(out) = Command::new(name).arg(flag).output() {
             if out.status.success() || !out.stdout.is_empty() || !out.stderr.is_empty() {
-                // Some CLIs exit non-zero on --version but still print; treat as present if we got any output.
                 if out.status.success()
                     || !out.stdout.is_empty()
-                    || String::from_utf8_lossy(&out.stderr).to_lowercase().contains(name)
+                    || String::from_utf8_lossy(&out.stderr)
+                        .to_lowercase()
+                        .contains(name)
                 {
                     return true;
                 }
             }
         }
     }
-    // Last resort: `which`-like via `command -v` not available; try bare spawn of --help
     Command::new(name)
         .arg("--help")
         .output()
@@ -74,12 +74,14 @@ pub fn binary_available(name: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// In-process harper-core is always linked in this build.
+pub fn harper_core_available() -> bool {
+    true
+}
+
 /// Construct the Vale command line for the given paths (tested without running Vale).
 pub fn vale_command_args(paths: &[PathBuf]) -> Vec<String> {
-    let mut args = vec![
-        "--output=JSON".to_string(),
-        "--no-exit".to_string(),
-    ];
+    let mut args = vec!["--output=JSON".to_string(), "--no-exit".to_string()];
     for p in paths {
         args.push(p.display().to_string());
     }
@@ -95,7 +97,7 @@ pub fn harper_command_args(paths: &[PathBuf]) -> Vec<String> {
     args
 }
 
-/// Resolve which binary name to use for Harper.
+/// Resolve which binary name to use for Harper CLI (optional fallback).
 pub fn harper_binary_name() -> Option<&'static str> {
     for name in ["harper-cli", "harper", "harperls"] {
         if binary_available(name) {
@@ -106,7 +108,8 @@ pub fn harper_binary_name() -> Option<&'static str> {
 }
 
 /// Lint the given paths with the selected engine(s).
-/// Missing tools produce explicit entries in `report.missing` and do **not** panic.
+/// Missing *optional* tools produce explicit entries in `report.missing` and do **not** panic.
+/// Harper always uses in-process `harper-core` when the Harper engine is selected.
 pub fn lint_paths(paths: &[PathBuf], engine: LintEngine) -> Result<LintReport> {
     if paths.is_empty() {
         bail!("no paths to lint");
@@ -146,8 +149,26 @@ pub fn lint_paths(paths: &[PathBuf], engine: LintEngine) -> Result<LintReport> {
     }
 
     if want_harper {
+        // Primary: in-process harper-core (no PATH dependency).
+        match run_harper_inprocess(paths) {
+            Ok(mut findings) => {
+                report.ran.push("harper-core".into());
+                report.findings.append(&mut findings);
+            }
+            Err(e) => {
+                report.findings.push(LintFinding {
+                    engine: "harper-core".into(),
+                    path: String::new(),
+                    message: format!("harper-core lint failed: {e}"),
+                    severity: "error".into(),
+                    line: None,
+                });
+                report.ran.push("harper-core".into());
+            }
+        }
+        // Optional: also surface CLI findings when a binary is present.
         if let Some(bin) = harper_binary_name() {
-            match run_harper(bin, paths) {
+            match run_harper_cli(bin, paths) {
                 Ok(mut findings) => {
                     report.ran.push(bin.into());
                     report.findings.append(&mut findings);
@@ -156,23 +177,122 @@ pub fn lint_paths(paths: &[PathBuf], engine: LintEngine) -> Result<LintReport> {
                     report.findings.push(LintFinding {
                         engine: bin.into(),
                         path: String::new(),
-                        message: format!("harper invocation failed: {e}"),
+                        message: format!("harper CLI invocation failed: {e}"),
                         severity: "error".into(),
                         line: None,
                     });
                     report.ran.push(bin.into());
                 }
             }
-        } else {
-            report.missing.push(
-                "harper is not installed or not on PATH (tried harper-cli, harper, harperls); install Harper for grammar checks"
-                    .into(),
-            );
         }
     }
 
-    // If every requested engine is missing, still succeed with an explicit report (non-panic).
     Ok(report)
+}
+
+/// Lint a single text buffer with in-process harper-core (unit-testable pure path).
+pub fn lint_text_harper_inprocess(text: &str) -> Vec<LintFinding> {
+    use harper_core::linting::{LintGroup, Linter};
+    use harper_core::spell::FstDictionary;
+    use harper_core::{Dialect, Document};
+
+    let mut grammar = LintGroup::new_curated(FstDictionary::curated(), Dialect::American);
+    let mut findings = Vec::new();
+    for (start_line, paragraph) in prose_paragraphs(text) {
+        if paragraph.trim().is_empty() {
+            continue;
+        }
+        let doc = Document::new_plain_english_curated(&paragraph);
+        for lint in grammar.lint(&doc) {
+            let snippet = doc.get_span_content_str(&lint.span);
+            let kind = format!("{:?}", lint.lint_kind);
+            findings.push(LintFinding {
+                engine: "harper-core".into(),
+                path: String::new(),
+                message: format!("[{kind}] '{snippet}' — {}", lint.message),
+                severity: "suggestion".into(),
+                line: Some(start_line as u32),
+            });
+        }
+    }
+    findings
+}
+
+fn run_harper_inprocess(paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
+    let mut all = Vec::new();
+    for path in paths {
+        let text = std::fs::read_to_string(path)
+            .with_context(|| format!("read {} for harper-core", path.display()))?;
+        let display = path.display().to_string();
+        for mut f in lint_text_harper_inprocess(&text) {
+            f.path = display.clone();
+            all.push(f);
+        }
+    }
+    Ok(all)
+}
+
+/// Yield (1-based start line, paragraph text), skipping front matter, headings, fences, lists markers lightly.
+fn prose_paragraphs(text: &str) -> Vec<(usize, String)> {
+    let mut body = text;
+    // Strip YAML front matter if present.
+    if let Some(rest) = body.strip_prefix("---") {
+        if let Some(end) = rest.find("\n---") {
+            body = rest[end + 4..].trim_start_matches(['\r', '\n']);
+        }
+    }
+    let mut paragraphs = Vec::new();
+    let mut buf = String::new();
+    let mut buf_start = 0usize;
+    let mut in_fence = false;
+    // Map body lines back to original line numbers: count skipped front-matter lines.
+    let line_offset = text[..text.len() - body.len()].lines().count();
+
+    for (idx, raw) in body.lines().enumerate() {
+        let line_no = line_offset + idx + 1;
+        let line = raw.trim();
+        if line.starts_with("```") {
+            in_fence = !in_fence;
+            if !buf.is_empty() {
+                paragraphs.push((buf_start, std::mem::take(&mut buf)));
+            }
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        let skip = line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with('|')
+            || line.starts_with("---");
+        if skip {
+            if !buf.is_empty() {
+                paragraphs.push((buf_start, std::mem::take(&mut buf)));
+            }
+            continue;
+        }
+        let body_line = line
+            .trim_start_matches(|c: char| matches!(c, '-' | '+' | '*' | '#'))
+            .trim_start_matches(|c: char| c.is_ascii_digit())
+            .trim_start_matches(['.', ')'])
+            .trim();
+        if body_line.is_empty() {
+            if !buf.is_empty() {
+                paragraphs.push((buf_start, std::mem::take(&mut buf)));
+            }
+            continue;
+        }
+        if buf.is_empty() {
+            buf_start = line_no;
+        } else {
+            buf.push(' ');
+        }
+        buf.push_str(body_line);
+    }
+    if !buf.is_empty() {
+        paragraphs.push((buf_start, buf));
+    }
+    paragraphs
 }
 
 fn run_vale(paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
@@ -185,7 +305,6 @@ fn run_vale(paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // Vale JSON: object keyed by file path -> array of alerts
     if let Ok(map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&stdout) {
         let mut findings = Vec::new();
         for (path, alerts) in map {
@@ -221,7 +340,6 @@ fn run_vale(paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
         return Ok(findings);
     }
 
-    // Non-JSON fallback: treat non-empty human output as a single informational finding set
     let mut findings = Vec::new();
     let combined = format!("{stdout}{stderr}");
     if !combined.trim().is_empty() && !output.status.success() {
@@ -244,7 +362,7 @@ fn run_vale(paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
     Ok(findings)
 }
 
-fn run_harper(bin: &str, paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
+fn run_harper_cli(bin: &str, paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
     let args = harper_command_args(paths);
     let output = Command::new(bin)
         .args(&args)
@@ -256,7 +374,6 @@ fn run_harper(bin: &str, paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
     let combined = format!("{stdout}{stderr}");
     let mut findings = Vec::new();
 
-    // Harper CLI output formats vary; capture non-empty lines as findings when it reports issues.
     if !output.status.success() || combined.to_lowercase().contains("error") {
         for line in combined.lines().take(100) {
             let line = line.trim();
@@ -275,7 +392,6 @@ fn run_harper(bin: &str, paths: &[PathBuf]) -> Result<Vec<LintFinding>> {
             });
         }
     }
-    // Clean exit with no output → zero findings (success)
     Ok(findings)
 }
 
@@ -290,10 +406,7 @@ pub fn format_report(report: &LintReport) -> String {
         out.push('\n');
     }
     for f in &report.findings {
-        let line = f
-            .line
-            .map(|n| format!(":{n}"))
-            .unwrap_or_default();
+        let line = f.line.map(|n| format!(":{n}")).unwrap_or_default();
         out.push_str(&format!(
             "[{}] {}{}: {} ({})\n",
             f.engine, f.path, line, f.message, f.severity
@@ -305,7 +418,6 @@ pub fn format_report(report: &LintReport) -> String {
     out
 }
 
-/// Helper for tests: assert vale args include JSON output mode.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,16 +439,49 @@ mod tests {
     }
 
     #[test]
-    fn missing_tools_produce_explicit_messages() {
-        // Use a path that exists for the empty-check; engines may or may not be present.
-        let paths = vec![PathBuf::from("Cargo.toml")];
-        // Force both engines; if missing, we get messages rather than panic.
-        let report = lint_paths(&paths, LintEngine::All).unwrap();
-        // At least one of: ran something, or reported missing.
+    fn harper_inprocess_flags_classic_article_error() {
+        // Documented harper-core example sentence.
+        let findings = lint_text_harper_inprocess("This is an test.");
         assert!(
-            !report.ran.is_empty() || !report.missing.is_empty(),
-            "expected ran or missing entries: {report:?}"
+            !findings.is_empty(),
+            "expected at least one grammar finding for 'This is an test.': {findings:?}"
         );
+        assert!(findings.iter().all(|f| f.engine == "harper-core"));
+    }
+
+    #[test]
+    fn lint_paths_harper_runs_inprocess_without_cli() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("bad.md");
+        std::fs::write(&p, "This is an test of the grammar engine.\n").unwrap();
+        let report = lint_paths(&[p], LintEngine::Harper).unwrap();
+        assert!(
+            report.ran.iter().any(|r| r == "harper-core"),
+            "expected harper-core in ran: {:?}",
+            report.ran
+        );
+        // Must not claim MISSING harper when in-process works
+        assert!(
+            report
+                .missing
+                .iter()
+                .all(|m| !m.to_lowercase().contains("harper")),
+            "unexpected missing harper: {:?}",
+            report.missing
+        );
+    }
+
+    #[test]
+    fn missing_vale_still_explicit_when_all() {
+        let paths = vec![PathBuf::from("Cargo.toml")];
+        let report = lint_paths(&paths, LintEngine::All).unwrap();
+        // harper-core always runs
+        assert!(
+            report.ran.iter().any(|r| r == "harper-core"),
+            "ran={:?}",
+            report.ran
+        );
+        // If vale missing, message is explicit
         for m in &report.missing {
             assert!(
                 m.contains("not installed") || m.contains("PATH"),

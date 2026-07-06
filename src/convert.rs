@@ -4,6 +4,19 @@ use anyhow::{bail, Context, Result};
 use std::path::Path;
 use std::process::Command;
 
+/// First line of `pandoc --version` when available.
+pub fn pandoc_version_line() -> Option<String> {
+    let out = Command::new("pandoc").arg("--version").output().ok()?;
+    if !out.status.success() && out.stdout.is_empty() {
+        return None;
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
 /// Check whether `pandoc` is available on PATH.
 pub fn tool_available() -> bool {
     Command::new("pandoc")
