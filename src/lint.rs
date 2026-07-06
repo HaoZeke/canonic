@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 /// Which external (or in-process) lint engine to run.
