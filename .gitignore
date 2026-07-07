@@ -3,3 +3,5 @@
 .canonic-index/
 *.mdb
 .DS_Store
+.claude/
+.codex/
