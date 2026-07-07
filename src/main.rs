@@ -6,6 +6,7 @@ use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available}
 use canonic::corpus::{default_corpus_dir, walk_responses};
 use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
 use canonic::index::{default_index_dir, find_duplicates, reindex, search};
+use canonic::jira_import::{default_import_dir, import_jira, JiraConfig};
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -87,6 +88,18 @@ enum Commands {
         reindex: bool,
         #[arg(long)]
         json: bool,
+    },
+    /// Import existing Jira issue comments as review drafts (read path only; never writes corpus/responses)
+    ImportJira {
+        /// JQL selecting candidate issues, e.g. `project = HSP AND labels = canned-response`
+        jql: String,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long, default_value_t = 50)]
+        max_results: u32,
+        /// List issues that would be imported without fetching comments or writing files
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -283,6 +296,22 @@ fn run() -> Result<ExitCode> {
                         p.reason
                     );
                 }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::ImportJira {
+            jql,
+            out,
+            max_results,
+            dry_run,
+        } => {
+            let cfg = JiraConfig::from_env()?;
+            let out_dir = out.unwrap_or_else(default_import_dir);
+            let paths = import_jira(&cfg, &jql, &out_dir, max_results, dry_run)?;
+            let verb = if dry_run { "would import" } else { "imported" };
+            println!("{verb} {} issue(s) into {}:", paths.len(), out_dir.display());
+            for p in &paths {
+                println!("  {}", p.display());
             }
             Ok(ExitCode::SUCCESS)
         }

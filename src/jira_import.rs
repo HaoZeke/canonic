@@ -1,0 +1,436 @@
+//! Jira REST API v2 read path: pull existing issue comments into review drafts.
+//!
+//! This never writes into `corpus/responses/` directly. Imported drafts land
+//! under a separate directory so a human reviews and promotes each one,
+//! matching the "review before migration" rule the quality checks enforce.
+
+use crate::convert::convert_jira_to_markdown;
+use anyhow::{bail, Context, Result};
+use serde::Deserialize;
+use std::path::{Path, PathBuf};
+
+/// Where imported drafts land by default (never auto-indexed or quality-checked).
+pub fn default_import_dir() -> PathBuf {
+    PathBuf::from("corpus/imports")
+}
+
+/// How to authenticate against the Jira REST API.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JiraAuth {
+    /// Jira Cloud convention: an account email plus an API token.
+    Basic { user: String, token: String },
+    /// A raw `Authorization` header value, e.g. `Bearer <personal-access-token>`
+    /// for Jira Server/Data Center.
+    Header(String),
+}
+
+/// Jira instance connection details.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JiraConfig {
+    pub base_url: String,
+    pub auth: JiraAuth,
+}
+
+impl JiraConfig {
+    pub fn new(base_url: impl Into<String>, auth: JiraAuth) -> Self {
+        Self {
+            base_url: base_url.into(),
+            auth,
+        }
+    }
+
+    /// Read `JIRA_BASE_URL` plus either `JIRA_AUTH_HEADER` (a raw `Authorization`
+    /// value) or `JIRA_EMAIL` + `JIRA_API_TOKEN` (Basic auth).
+    pub fn from_env() -> Result<Self> {
+        let base_url = std::env::var("JIRA_BASE_URL")
+            .context("JIRA_BASE_URL is not set (e.g. https://your-instance.atlassian.net)")?;
+        if let Ok(header) = std::env::var("JIRA_AUTH_HEADER") {
+            return Ok(Self::new(base_url, JiraAuth::Header(header)));
+        }
+        let user = std::env::var("JIRA_EMAIL")
+            .context("set JIRA_AUTH_HEADER, or JIRA_EMAIL + JIRA_API_TOKEN")?;
+        let token = std::env::var("JIRA_API_TOKEN").context("JIRA_API_TOKEN is not set")?;
+        Ok(Self::new(base_url, JiraAuth::Basic { user, token }))
+    }
+}
+
+fn apply_auth(
+    req: reqwest::blocking::RequestBuilder,
+    auth: &JiraAuth,
+) -> reqwest::blocking::RequestBuilder {
+    match auth {
+        JiraAuth::Basic { user, token } => req.basic_auth(user, Some(token)),
+        JiraAuth::Header(value) => req.header(reqwest::header::AUTHORIZATION, value),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchResponse {
+    #[serde(rename = "startAt")]
+    start_at: u32,
+    total: u32,
+    issues: Vec<SearchIssue>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchIssue {
+    key: String,
+    fields: SearchFields,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchFields {
+    summary: String,
+}
+
+/// One issue found by a JQL search: key plus its summary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueSummary {
+    pub key: String,
+    pub summary: String,
+}
+
+fn parse_search_response(json: &str) -> Result<(Vec<IssueSummary>, u32, u32)> {
+    let parsed: SearchResponse =
+        serde_json::from_str(json).context("parse Jira search response")?;
+    let issues = parsed
+        .issues
+        .into_iter()
+        .map(|i| IssueSummary {
+            key: i.key,
+            summary: i.fields.summary,
+        })
+        .collect();
+    Ok((issues, parsed.start_at, parsed.total))
+}
+
+#[derive(Debug, Deserialize)]
+struct CommentsResponse {
+    comments: Vec<RawComment>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawComment {
+    author: RawUser,
+    body: String,
+    created: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawUser {
+    #[serde(rename = "displayName")]
+    display_name: String,
+}
+
+/// One comment on a Jira issue, with its body still in Jira wiki markup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueComment {
+    pub author: String,
+    pub created: String,
+    pub body_wiki: String,
+}
+
+fn parse_comments_response(json: &str) -> Result<Vec<IssueComment>> {
+    let parsed: CommentsResponse =
+        serde_json::from_str(json).context("parse Jira comments response")?;
+    Ok(parsed
+        .comments
+        .into_iter()
+        .map(|c| IssueComment {
+            author: c.author.display_name,
+            created: c.created,
+            body_wiki: c.body,
+        })
+        .collect())
+}
+
+fn build_search_request(
+    client: &reqwest::blocking::Client,
+    cfg: &JiraConfig,
+    jql: &str,
+    start_at: u32,
+    max_results: u32,
+) -> reqwest::Result<reqwest::blocking::Request> {
+    let url = format!("{}/rest/api/2/search", cfg.base_url.trim_end_matches('/'));
+    let start_at_s = start_at.to_string();
+    let max_results_s = max_results.to_string();
+    let req = client.get(&url).query(&[
+        ("jql", jql),
+        ("startAt", start_at_s.as_str()),
+        ("maxResults", max_results_s.as_str()),
+        ("fields", "summary"),
+    ]);
+    apply_auth(req, &cfg.auth).build()
+}
+
+fn build_comments_request(
+    client: &reqwest::blocking::Client,
+    cfg: &JiraConfig,
+    issue_key: &str,
+) -> reqwest::Result<reqwest::blocking::Request> {
+    let url = format!(
+        "{}/rest/api/2/issue/{issue_key}/comment",
+        cfg.base_url.trim_end_matches('/')
+    );
+    apply_auth(client.get(&url), &cfg.auth).build()
+}
+
+/// Search for issues matching `jql`, paginating until Jira reports no more.
+pub fn search_all_issues(
+    cfg: &JiraConfig,
+    jql: &str,
+    page_size: u32,
+) -> Result<Vec<IssueSummary>> {
+    let client = reqwest::blocking::Client::new();
+    let mut out = Vec::new();
+    let mut start_at = 0u32;
+    loop {
+        let req = build_search_request(&client, cfg, jql, start_at, page_size)
+            .context("build Jira search request")?;
+        let resp = client.execute(req).context("send Jira search request")?;
+        if !resp.status().is_success() {
+            bail!("Jira search failed: HTTP {}", resp.status());
+        }
+        let body = resp.text().context("read Jira search response")?;
+        let (mut issues, returned_start, total) = parse_search_response(&body)?;
+        let got = issues.len() as u32;
+        out.append(&mut issues);
+        if got == 0 || returned_start + got >= total {
+            break;
+        }
+        start_at = returned_start + got;
+    }
+    Ok(out)
+}
+
+/// Fetch all comments for one issue.
+pub fn fetch_comments(cfg: &JiraConfig, issue_key: &str) -> Result<Vec<IssueComment>> {
+    let client = reqwest::blocking::Client::new();
+    let req = build_comments_request(&client, cfg, issue_key)
+        .with_context(|| format!("build comments request for {issue_key}"))?;
+    let resp = client
+        .execute(req)
+        .with_context(|| format!("fetch comments for {issue_key}"))?;
+    if !resp.status().is_success() {
+        bail!(
+            "fetching comments for {issue_key} failed: HTTP {}",
+            resp.status()
+        );
+    }
+    let body = resp.text().context("read Jira comments response")?;
+    parse_comments_response(&body)
+}
+
+/// Turn a title into a slug: lowercase ASCII alphanumerics, everything else
+/// collapsed to a single `-`, with no leading, trailing, or repeated dash.
+pub fn slugify(title: &str) -> String {
+    let mut slug = String::new();
+    let mut last_dash = true; // suppress a leading dash
+    for c in title.to_lowercase().chars() {
+        if c.is_ascii_alphanumeric() {
+            slug.push(c);
+            last_dash = false;
+        } else if !last_dash {
+            slug.push('-');
+            last_dash = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        "topic".into()
+    } else {
+        slug
+    }
+}
+
+/// Render one issue's comments as a review draft: front matter plus one
+/// section per comment. `id` must already carry the `resp-` prefix.
+pub fn draft_markdown(
+    id: &str,
+    issue_key: &str,
+    title: &str,
+    comments: &[(String, String, String)],
+) -> String {
+    let mut out = format!(
+        "---\nid: {id}\ntitle: {title}\nprefix: resp\ntags: []\nsop: none\n---\n\n# {title}\n\n<!-- imported from {issue_key}; edit into a real answer, then move to corpus/responses/ -->\n"
+    );
+    for (author, created, body_md) in comments {
+        out.push_str(&format!(
+            "\n## Comment by {author} ({created})\n\n{}\n",
+            body_md.trim()
+        ));
+    }
+    out
+}
+
+/// Import issues matching `jql` into `out_dir` as review drafts (never
+/// `corpus/responses/`). Returns the paths written, or, when `dry_run` is
+/// set, the paths that would be written without touching the filesystem or
+/// fetching comments.
+pub fn import_jira(
+    cfg: &JiraConfig,
+    jql: &str,
+    out_dir: &Path,
+    max_results: u32,
+    dry_run: bool,
+) -> Result<Vec<PathBuf>> {
+    let issues = search_all_issues(cfg, jql, max_results)?;
+    if !dry_run {
+        std::fs::create_dir_all(out_dir)
+            .with_context(|| format!("create {}", out_dir.display()))?;
+    }
+    let mut written = Vec::new();
+    for issue in issues {
+        let id = format!(
+            "resp-{}-{}",
+            slugify(&issue.summary),
+            issue.key.to_lowercase()
+        );
+        let path = out_dir.join(format!("{id}.md"));
+        if dry_run {
+            written.push(path);
+            continue;
+        }
+        let comments = fetch_comments(cfg, &issue.key)?;
+        let rendered = comments
+            .into_iter()
+            .map(|c| -> Result<(String, String, String)> {
+                let md = convert_jira_to_markdown(&c.body_wiki)?;
+                Ok((c.author, c.created, md))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let text = draft_markdown(&id, &issue.key, &issue.summary, &rendered);
+        std::fs::write(&path, text).with_context(|| format!("write {}", path.display()))?;
+        written.push(path);
+    }
+    Ok(written)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SEARCH_FIXTURE: &str = r#"{
+        "expand": "names,schema",
+        "startAt": 0,
+        "maxResults": 50,
+        "total": 1,
+        "issues": [
+            {
+                "id": "10000",
+                "key": "HSP-1",
+                "self": "https://example.atlassian.net/rest/api/2/issue/10000",
+                "fields": { "summary": "Project space is not a backup" }
+            }
+        ]
+    }"#;
+
+    const COMMENTS_FIXTURE: &str = r#"{
+        "startAt": 0,
+        "maxResults": 50,
+        "total": 1,
+        "comments": [
+            {
+                "id": "10000",
+                "author": { "name": "fred", "displayName": "Fred F. User" },
+                "body": "h1. Heads up\n\nUse *self-service* for backups.",
+                "created": "2026-07-06T18:30:00.000+0000",
+                "updated": "2026-07-06T18:30:00.000+0000"
+            }
+        ]
+    }"#;
+
+    #[test]
+    fn parses_search_response_fixture() {
+        let (issues, start_at, total) = parse_search_response(SEARCH_FIXTURE).unwrap();
+        assert_eq!(start_at, 0);
+        assert_eq!(total, 1);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].key, "HSP-1");
+        assert_eq!(issues[0].summary, "Project space is not a backup");
+    }
+
+    #[test]
+    fn parses_comments_response_fixture() {
+        let comments = parse_comments_response(COMMENTS_FIXTURE).unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].author, "Fred F. User");
+        assert_eq!(comments[0].created, "2026-07-06T18:30:00.000+0000");
+        assert!(comments[0].body_wiki.contains("self-service"));
+    }
+
+    #[test]
+    fn slugify_collapses_punctuation_and_case() {
+        assert_eq!(
+            slugify("Project space is not a backup!"),
+            "project-space-is-not-a-backup"
+        );
+        assert_eq!(slugify("  ---  "), "topic");
+        assert_eq!(slugify("SBU / GPU-hours (2026)"), "sbu-gpu-hours-2026");
+    }
+
+    #[test]
+    fn search_request_targets_v2_search_with_auth() {
+        let client = reqwest::blocking::Client::new();
+        let cfg = JiraConfig::new(
+            "https://example.atlassian.net/",
+            JiraAuth::Basic {
+                user: "advisor@example.org".into(),
+                token: "tok".into(),
+            },
+        );
+        let req = build_search_request(&client, &cfg, "project = HSP", 0, 50).unwrap();
+        assert_eq!(req.url().path(), "/rest/api/2/search");
+        let query = req.url().query().unwrap_or_default();
+        assert!(query.contains("jql=project"), "{query}");
+        assert!(query.contains("maxResults=50"), "{query}");
+        assert!(req.headers().contains_key(reqwest::header::AUTHORIZATION));
+    }
+
+    #[test]
+    fn comments_request_targets_issue_path_with_bearer_header() {
+        let client = reqwest::blocking::Client::new();
+        let cfg = JiraConfig::new(
+            "https://jira.example.org",
+            JiraAuth::Header("Bearer some-pat".into()),
+        );
+        let req = build_comments_request(&client, &cfg, "HSP-1").unwrap();
+        assert_eq!(req.url().path(), "/rest/api/2/issue/HSP-1/comment");
+        assert_eq!(
+            req.headers()
+                .get(reqwest::header::AUTHORIZATION)
+                .unwrap(),
+            "Bearer some-pat"
+        );
+    }
+
+    #[test]
+    fn draft_markdown_has_required_front_matter_and_sections() {
+        let text = draft_markdown(
+            "resp-example-hsp-1",
+            "HSP-1",
+            "Example topic",
+            &[(
+                "Fred F. User".into(),
+                "2026-07-06T18:30:00.000+0000".into(),
+                "Use **self-service** for backups.".into(),
+            )],
+        );
+        assert!(text.contains("id: resp-example-hsp-1"));
+        assert!(text.contains("prefix: resp"));
+        assert!(text.contains("sop: none"));
+        assert!(text.contains("imported from HSP-1"));
+        assert!(text.contains("## Comment by Fred F. User"));
+        assert!(text.contains("self-service"));
+    }
+
+    #[test]
+    fn from_env_requires_base_url() {
+        // Isolated by variable name; does not touch real Jira config.
+        std::env::remove_var("JIRA_BASE_URL");
+        let err = JiraConfig::from_env().unwrap_err().to_string();
+        assert!(err.contains("JIRA_BASE_URL"));
+    }
+}

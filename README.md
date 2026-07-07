@@ -101,11 +101,24 @@ canonic reindex
 canonic search "project space backup"
 canonic dedupe --reindex --threshold 1.0
 canonic dedupe --threshold 0.5 --json
+
+JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
+  canonic import-jira "project = HSP AND labels = canned-response" --dry-run
 ```
 
 ### Dedupe
 
 `dedupe` rebuilds or reuses the Tantivy index, then for each response runs a self-query (title + content terms) and reports other documents that rank above `--threshold`. Pair reasons include the Tantivy score and a content **Jaccard** similarity for a second opinion. Use a high threshold to list only strong near-copies when curating the library before a Jira migration.
+
+### Jira import (read path)
+
+`import-jira <jql>` searches Jira via its representational state transfer (REST) API v2 (`/rest/api/2/search`, then `/rest/api/2/issue/{key}/comment` per result), converts each comment's wiki markup back to markdown with pandoc, and writes one draft file per issue under `corpus/imports/` — never directly into `corpus/responses/`, since a human still has to pick the real answer, assign a clean `id`, and set `sop`. `--dry-run` lists which issues canonic would import, without fetching comments.
+
+Authentication reads from the environment:
+
+- `JIRA_BASE_URL` — required, e.g. `https://your-instance.atlassian.net`.
+- `JIRA_EMAIL` + `JIRA_API_TOKEN` — Basic auth (the Jira Cloud convention).
+- `JIRA_AUTH_HEADER` — a raw `Authorization` header instead, e.g. `Bearer <personal-access-token>` for Jira Server/Data Center. Takes precedence over `JIRA_EMAIL`/`JIRA_API_TOKEN` when set.
 
 ### Doctor / check exit codes
 
@@ -125,7 +138,7 @@ Pass a branch name as the first argument to override the current branch.
 ## Design notes
 
 - **Tantivy BM25** for search and near-duplicate discovery (better fit for curation/dedupe than a hand-rolled store).
-- Markdown remains the source of truth; Jira is a publication surface. `canonic convert` produces the wiki markup, a human pastes or imports it — there is no live Jira API sync.
+- Markdown remains the source of truth; Jira is a publication surface. `canonic convert` produces the wiki markup for a human to paste in; `canonic import-jira` reads existing issue comments back out as drafts. Neither direction writes to Jira automatically.
 - Quality checks implement the meeting rule: **review before migration**, shared `resp` prefix only.
 
 ## Citation

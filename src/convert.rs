@@ -26,15 +26,14 @@ pub fn tool_available() -> bool {
         .unwrap_or(false)
 }
 
-/// Convert markdown text to Jira wiki markup via `pandoc -f markdown -t jira`.
-pub fn convert_markdown_to_jira(markdown: &str) -> Result<String> {
+fn run_pandoc(from: &str, to: &str, input: &str) -> Result<String> {
     if !tool_available() {
         bail!(
-            "pandoc is not installed or not on PATH; install pandoc to convert markdown to jira markup"
+            "pandoc is not installed or not on PATH; install pandoc to convert between markdown and jira markup"
         );
     }
     let mut child = Command::new("pandoc")
-        .args(["-f", "markdown", "-t", "jira"])
+        .args(["-f", from, "-t", to])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -45,8 +44,8 @@ pub fn convert_markdown_to_jira(markdown: &str) -> Result<String> {
     {
         let mut stdin = child.stdin.take().context("open pandoc stdin")?;
         stdin
-            .write_all(markdown.as_bytes())
-            .context("write markdown to pandoc")?;
+            .write_all(input.as_bytes())
+            .context("write input to pandoc")?;
     }
 
     let output = child.wait_with_output().context("wait for pandoc")?;
@@ -55,6 +54,17 @@ pub fn convert_markdown_to_jira(markdown: &str) -> Result<String> {
         bail!("pandoc failed (status {}): {err}", output.status);
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Convert markdown text to Jira wiki markup via `pandoc -f markdown -t jira`.
+pub fn convert_markdown_to_jira(markdown: &str) -> Result<String> {
+    run_pandoc("markdown", "jira", markdown)
+}
+
+/// Convert Jira wiki markup back to markdown via `pandoc -f jira -t markdown`
+/// (the reverse of [`convert_markdown_to_jira`]; used by the Jira import read path).
+pub fn convert_jira_to_markdown(jira: &str) -> Result<String> {
+    run_pandoc("jira", "markdown", jira)
 }
 
 /// Read a markdown file and convert to Jira markup.
@@ -102,5 +112,19 @@ mod tests {
             jira.contains("*self-service*") || jira.contains("self-service"),
             "expected bold or body text, got: {jira:?}"
         );
+    }
+
+    #[test]
+    fn convert_jira_to_markdown_reverses_the_writer() {
+        if !tool_available() {
+            let err = convert_jira_to_markdown("h1. Hi").unwrap_err().to_string();
+            assert!(err.to_lowercase().contains("pandoc"));
+            return;
+        }
+        let markdown =
+            convert_jira_to_markdown("h1. Password reset\n\nUse *self-service* portal.\n")
+                .unwrap();
+        assert!(markdown.contains("# Password reset"), "{markdown:?}");
+        assert!(markdown.contains("**self-service**"), "{markdown:?}");
     }
 }
