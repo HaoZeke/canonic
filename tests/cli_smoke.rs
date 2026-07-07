@@ -1,6 +1,10 @@
-//! Smoke tests that drive the real `canonic` binary.
+//! Smoke tests that drive the real `canonic` binary against synthetic fixtures.
+//!
+//! Fixtures are generated per test rather than read from `corpus/responses/`,
+//! so these tests stay green regardless of what the team has actually published.
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn bin() -> PathBuf {
@@ -11,11 +15,29 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+/// Write a minimal well-formed `resp-` response fixture and return its path.
+fn write_response(dir: &Path, slug: &str, title: &str, body: &str) -> PathBuf {
+    let id = format!("resp-{slug}");
+    let path = dir.join(format!("{id}.md"));
+    fs::write(
+        &path,
+        format!(
+            "---\nid: {id}\ntitle: {title}\nprefix: resp\nsop: none\n---\n\n# {title}\n\n{body}\n\nRegards,\nSupport Team\n"
+        ),
+    )
+    .unwrap();
+    path
+}
+
 #[test]
-fn list_shows_resp_corpus() {
+fn list_shows_corpus_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    write_response(dir.path(), "alpha-topic", "Alpha topic", "Alpha body text.");
+    write_response(dir.path(), "beta-topic", "Beta topic", "Beta body text.");
+
     let out = Command::new(bin())
         .current_dir(repo_root())
-        .args(["list", "--corpus", "corpus/responses"])
+        .args(["list", "--corpus", dir.path().to_str().unwrap()])
         .output()
         .expect("run list");
     assert!(
@@ -24,16 +46,18 @@ fn list_shows_resp_corpus() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("resp-project-space-not-backup"), "{stdout}");
-    assert!(stdout.contains("resp-small-compute-sbu-calculation"), "{stdout}");
-    assert!(!stdout.contains("password-reset"), "{stdout}");
+    assert!(stdout.contains("resp-alpha-topic"), "{stdout}");
+    assert!(stdout.contains("resp-beta-topic"), "{stdout}");
 }
 
 #[test]
-fn check_passes_on_shipped_resp_corpus() {
+fn check_passes_on_well_formed_corpus() {
+    let dir = tempfile::tempdir().unwrap();
+    write_response(dir.path(), "alpha-topic", "Alpha topic", "Alpha body text.");
+
     let out = Command::new(bin())
         .current_dir(repo_root())
-        .args(["check", "--corpus", "corpus/responses"])
+        .args(["check", "--corpus", dir.path().to_str().unwrap()])
         .output()
         .expect("check");
     assert!(
@@ -43,21 +67,55 @@ fn check_passes_on_shipped_resp_corpus() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("All quality checks passed") || stdout.contains("0 finding"), "{stdout}");
+    assert!(
+        stdout.contains("All quality checks passed") || stdout.contains("0 finding"),
+        "{stdout}"
+    );
+}
+
+#[test]
+fn check_fails_on_missing_prefix_and_sop() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("password-reset.md"),
+        "---\nid: password-reset\n---\n\nBody\n",
+    )
+    .unwrap();
+
+    let out = Command::new(bin())
+        .current_dir(repo_root())
+        .args(["check", "--corpus", dir.path().to_str().unwrap()])
+        .output()
+        .expect("check");
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("id-prefix"), "{stdout}");
+    assert!(stdout.contains("sop-field"), "{stdout}");
 }
 
 #[test]
 fn reindex_search_and_dedupe_roundtrip() {
-    let root = repo_root();
-    let idx = root.join("target/test-canonic-tantivy-cli");
-    let _ = std::fs::remove_dir_all(&idx);
+    let dir = tempfile::tempdir().unwrap();
+    write_response(
+        dir.path(),
+        "project-space-not-backup",
+        "Project space is not a backup",
+        "Project space is not a backup or archive. Use tape for long-term retention.",
+    );
+    write_response(
+        dir.path(),
+        "small-compute-sbu",
+        "SBU calculation",
+        "Small compute needs an SBU calculation for GPU and CPU hours.",
+    );
+    let idx = dir.path().join("index");
 
     let re = Command::new(bin())
-        .current_dir(&root)
+        .current_dir(repo_root())
         .args([
             "reindex",
             "--corpus",
-            "corpus/responses",
+            dir.path().to_str().unwrap(),
             "--index",
             idx.to_str().unwrap(),
         ])
@@ -70,7 +128,7 @@ fn reindex_search_and_dedupe_roundtrip() {
     );
 
     let se = Command::new(bin())
-        .current_dir(&root)
+        .current_dir(repo_root())
         .args([
             "search",
             "project space backup archive tape",
@@ -97,11 +155,11 @@ fn reindex_search_and_dedupe_roundtrip() {
     );
 
     let de = Command::new(bin())
-        .current_dir(&root)
+        .current_dir(repo_root())
         .args([
             "dedupe",
             "--corpus",
-            "corpus/responses",
+            dir.path().to_str().unwrap(),
             "--index",
             idx.to_str().unwrap(),
             "--threshold",
@@ -114,7 +172,6 @@ fn reindex_search_and_dedupe_roundtrip() {
         "stderr={}",
         String::from_utf8_lossy(&de.stderr)
     );
-    // Distinct topics at high threshold: expect no pairs or only empty message
     let dstdout = String::from_utf8_lossy(&de.stdout);
     assert!(
         dstdout.contains("no near-duplicate") || dstdout.contains("↔") || dstdout.starts_with("["),
@@ -123,7 +180,7 @@ fn reindex_search_and_dedupe_roundtrip() {
 }
 
 #[test]
-fn convert_resp_sample_when_pandoc_present() {
+fn convert_sample_when_pandoc_present() {
     let pandoc_ok = Command::new("pandoc")
         .arg("--version")
         .output()
@@ -133,12 +190,17 @@ fn convert_resp_sample_when_pandoc_present() {
         eprintln!("skip convert: pandoc missing");
         return;
     }
+    let dir = tempfile::tempdir().unwrap();
+    let path = write_response(
+        dir.path(),
+        "project-space-not-backup",
+        "Project space is not a backup",
+        "Project space is **not** a backup or archive.",
+    );
+
     let out = Command::new(bin())
         .current_dir(repo_root())
-        .args([
-            "convert",
-            "corpus/responses/resp-project-space-not-backup.md",
-        ])
+        .args(["convert", path.to_str().unwrap()])
         .output()
         .expect("convert");
     assert!(
