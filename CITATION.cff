@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Goswami
+    given-names: Rohit
+    orcid: https://orcid.org/0000-0002-2393-8056
+    affiliation: "University of Iceland"
+    email: "rgoswami@ieee.org"
+title: "canonic"
+version: 0.1.0
+date-released: "2026-07-07"
+license: MIT
+repository-code: https://github.com/HaoZeke/canonic
+abstract: |
+  Versioned Jira Jira canned-response corpus: markdown source of
+  truth, pandoc jira convert, quality checks, Tantivy search/dedupe.
+keywords:
+  - jira
+  - canned-responses
+  - tantivy
+  - full-text-search
+  - hpc-support
