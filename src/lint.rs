@@ -55,23 +55,17 @@ impl LintReport {
 pub fn binary_available(name: &str) -> bool {
     for flag in ["--version", "--help", "version"] {
         if let Ok(out) = Command::new(name).arg(flag).output() {
-            if out.status.success() || !out.stdout.is_empty() || !out.stderr.is_empty() {
-                if out.status.success()
-                    || !out.stdout.is_empty()
-                    || String::from_utf8_lossy(&out.stderr)
-                        .to_lowercase()
-                        .contains(name)
-                {
-                    return true;
-                }
+            if out.status.success()
+                || !out.stdout.is_empty()
+                || String::from_utf8_lossy(&out.stderr)
+                    .to_lowercase()
+                    .contains(name)
+            {
+                return true;
             }
         }
     }
-    Command::new(name)
-        .arg("--help")
-        .output()
-        .map(|o| o.status.success() || !o.stdout.is_empty() || !o.stderr.is_empty())
-        .unwrap_or(false)
+    false
 }
 
 /// In-process harper-core is always linked in this build.
@@ -99,12 +93,9 @@ pub fn harper_command_args(paths: &[PathBuf]) -> Vec<String> {
 
 /// Resolve which binary name to use for Harper CLI (optional fallback).
 pub fn harper_binary_name() -> Option<&'static str> {
-    for name in ["harper-cli", "harper", "harperls"] {
-        if binary_available(name) {
-            return Some(name);
-        }
-    }
-    None
+    ["harper-cli", "harper", "harperls"]
+        .into_iter()
+        .find(|name| binary_available(name))
 }
 
 /// Lint the given paths with the selected engine(s).
@@ -272,7 +263,7 @@ fn prose_paragraphs(text: &str) -> Vec<(usize, String)> {
             continue;
         }
         let body_line = line
-            .trim_start_matches(|c: char| matches!(c, '-' | '+' | '*' | '#'))
+            .trim_start_matches(['-', '+', '*', '#'])
             .trim_start_matches(|c: char| c.is_ascii_digit())
             .trim_start_matches(['.', ')'])
             .trim();

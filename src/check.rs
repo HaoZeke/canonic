@@ -148,12 +148,6 @@ fn check_one(doc: &CannedResponse) -> Vec<CheckFinding> {
         ));
     }
 
-    // Prefer shared team closing over a lone first name
-    let lower = doc.content.to_lowercase();
-    if lower.contains("best regards,") || lower.contains("kind regards,") {
-        // ok, but still check for personal name line after regards
-    }
-
     out
 }
 
