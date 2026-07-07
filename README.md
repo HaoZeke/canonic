@@ -112,6 +112,16 @@ canonic dedupe --threshold 0.5 --json
 - `doctor`: `1` if pandoc missing (convert blocked)
 - `check`: `1` if any quality finding
 
+### Mirroring for team MR review
+
+`scripts/mirror-to-gitlab.sh` pushes the current branch to a second remote (added or updated on each run) so a team can open merge requests on a self-hosted GitLab that GitHub does not mirror to automatically:
+
+```bash
+CANONIC_GITLAB_REMOTE=git@gitlab.example:group/canonic.git scripts/mirror-to-gitlab.sh
+```
+
+Pass a branch name as the first argument to override the current branch.
+
 ## Design notes
 
 - **Tantivy BM25** for search and near-duplicate discovery (better fit for curation/dedupe than a hand-rolled store).
