@@ -1,6 +1,6 @@
 # canonic
 
-**Canonical** canned-response corpus for Jira Jira work: version-controlled **markdown** under a shared **`resp-`** prefix is the source of truth. Convert with **pandoc**, enforce **quality checks** before migration, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
+**Canonical** canned-response corpus for the generic Jira Jira work: version-controlled **markdown** under a shared **`resp-`** prefix is the source of truth. Convert with **pandoc**, enforce **quality checks** before migration, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
 
 ## Requirements
 
@@ -11,12 +11,61 @@
 | [Vale](https://vale.sh/) | optional style lint |
 | Harper | **in-process `harper-core`** (linked); optional CLI on `PATH` |
 
-## Corpus layout (Support `resp` prefix)
+## Build
+
+```bash
+cargo build --release
+```
+
+## Tutorial: your first canned response
+
+`corpus/responses/` starts empty (only a `.gitkeep` placeholder), so every response your team publishes comes from a reviewed answer. This walks through adding one.
+
+1. Create `corpus/responses/resp-example-topic.md`:
+
+   ```markdown
+   ---
+   id: resp-example-topic
+   title: Example topic
+   prefix: resp
+   tags: [example]
+   sop: none
+   ---
+
+   # Example topic
+
+   Replace this with the real advisor answer.
+
+   Regards,
+   Support Team
+   ```
+
+2. Validate the front matter and closing:
+
+   ```bash
+   cargo run -- check
+   ```
+
+3. Index it and search:
+
+   ```bash
+   cargo run -- reindex
+   cargo run -- search "example topic"
+   ```
+
+4. Convert to Jira wiki markup (requires pandoc):
+
+   ```bash
+   cargo run -- convert corpus/responses/resp-example-topic.md
+   ```
+
+Delete `resp-example-topic.md` once you commit a real response under its own id; it exists only to teach the format.
+
+## Corpus layout (`resp` prefix)
 
 ```
 corpus/responses/
-  resp-project-space-not-backup.md
-  resp-small-compute-sbu-calculation.md
+  resp-<topic-slug>.md
   ...
 ```
 
@@ -24,10 +73,10 @@ Front matter convention (enforced by `canonic check`):
 
 ```markdown
 ---
-id: resp-project-space-not-backup
-title: Project space is not a backup or archive
+id: resp-<topic-slug>
+title: Human-readable title
 prefix: resp
-tags: [storage, project-space]
+tags: [tag-one, tag-two]
 sop: none
 ---
 ```
@@ -37,15 +86,7 @@ sop: none
 - `sop:` required — Confluence URL or literal `none`
 - Closings must be team-generic (e.g. `Support Team`), not personal names
 
-Samples are drafted from the 2026-07-06 team onboarding / HPC advisors meeting (project space, SBU math, top-up/extension, local-facilities data collection, GPFS triage, account permission).
-
-The Tantivy index under `.canonic-index/` is generated and gitignored.
-
-## Build
-
-```bash
-cargo build --release
-```
+`.gitignore` excludes the Tantivy index generated under `.canonic-index/`.
 
 ## Usage
 
@@ -53,7 +94,7 @@ cargo build --release
 canonic doctor
 canonic list
 canonic check                          # quality gate (exit 1 on findings)
-canonic convert corpus/responses/resp-project-space-not-backup.md
+canonic convert corpus/responses/resp-example-topic.md
 canonic lint --engine harper
 
 canonic reindex
@@ -77,6 +118,10 @@ canonic dedupe --threshold 0.5 --json
 - Markdown remains the source of truth; Jira is a publication surface (API sync still future work).
 - Quality checks implement the meeting rule: **review before migration**, shared `resp` prefix only.
 
+## Citation
+
+See `CITATION.cff`, or use GitHub's "Cite this repository" button.
+
 ## License
 
-MIT
+MIT — see `LICENSE`.
