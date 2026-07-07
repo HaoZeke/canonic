@@ -115,7 +115,7 @@ canonic dedupe --threshold 0.5 --json
 ## Design notes
 
 - **Tantivy BM25** for search and near-duplicate discovery (better fit for curation/dedupe than a hand-rolled store).
-- Markdown remains the source of truth; Jira is a publication surface (API sync still future work).
+- Markdown remains the source of truth; Jira is a publication surface. `canonic convert` produces the wiki markup, a human pastes or imports it — there is no live Jira API sync.
 - Quality checks implement the meeting rule: **review before migration**, shared `resp` prefix only.
 
 ## Citation
