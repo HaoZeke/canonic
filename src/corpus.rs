@@ -13,6 +13,10 @@ pub struct CannedResponse {
     pub id: String,
     /// Display title (front matter `title` or first heading / id).
     pub title: String,
+    /// Shared prefix (front matter `prefix`, e.g. `resp`).
+    pub prefix: Option<String>,
+    /// Optional SOP link or the literal `none`.
+    pub sop: Option<String>,
     /// Full markdown body (including optional front matter as stored on disk).
     pub body: String,
     /// Body with YAML front matter stripped, used for search/indexing.
@@ -63,10 +67,7 @@ pub fn load_response(path: &Path) -> Result<CannedResponse> {
         .to_string();
 
     let (fm, content) = split_front_matter(&raw);
-    let id = fm
-        .get("id")
-        .cloned()
-        .unwrap_or_else(|| stem.clone());
+    let id = fm.get("id").cloned().unwrap_or_else(|| stem.clone());
     let title = fm
         .get("title")
         .cloned()
@@ -76,10 +77,14 @@ pub fn load_response(path: &Path) -> Result<CannedResponse> {
         .get("tags")
         .map(|s| parse_tags(s))
         .unwrap_or_default();
+    let prefix = fm.get("prefix").cloned().filter(|s| !s.is_empty());
+    let sop = fm.get("sop").cloned().filter(|s| !s.is_empty());
 
     Ok(CannedResponse {
         id,
         title,
+        prefix,
+        sop,
         body: raw,
         content,
         path: path.to_path_buf(),
@@ -88,7 +93,6 @@ pub fn load_response(path: &Path) -> Result<CannedResponse> {
 }
 
 /// Minimal YAML front-matter parser for `key: value` and simple list tags.
-/// Not a full YAML implementation — enough for our corpus convention.
 fn split_front_matter(raw: &str) -> (std::collections::HashMap<String, String>, String) {
     let mut map = std::collections::HashMap::new();
     let trimmed = raw.trim_start_matches('\u{feff}');
@@ -156,15 +160,17 @@ mod tests {
         let mut f = fs::File::create(&p).unwrap();
         writeln!(
             f,
-            "---\nid: sample-id\ntitle: Sample Title\ntags: [a, b]\n---\n\n# Heading\n\nBody text.\n"
+            "---\nid: resp-sample\ntitle: Sample Title\nprefix: resp\nsop: none\ntags: [a, b]\n---\n\n# Heading\n\nBody text.\n"
         )
         .unwrap();
         let r = load_response(&p).unwrap();
-        assert_eq!(r.id, "sample-id");
+        assert_eq!(r.id, "resp-sample");
         assert_eq!(r.title, "Sample Title");
+        assert_eq!(r.prefix.as_deref(), Some("resp"));
+        assert_eq!(r.sop.as_deref(), Some("none"));
         assert_eq!(r.tags, vec!["a", "b"]);
         assert!(r.content.contains("Body text"));
-        assert!(!r.content.contains("sample-id"));
+        assert!(!r.content.contains("resp-sample"));
     }
 
     #[test]

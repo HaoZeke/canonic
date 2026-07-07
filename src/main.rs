@@ -1,10 +1,11 @@
 //! canonic — versioned Jira canned-response corpus CLI.
 
 use anyhow::{bail, Context, Result};
+use canonic::check::{check_corpus, format_check_report};
 use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available};
 use canonic::corpus::{default_corpus_dir, walk_responses};
 use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
-use canonic::index::{default_index_dir, reindex, search};
+use canonic::index::{default_index_dir, find_duplicates, reindex, search};
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -14,7 +15,7 @@ use std::process::ExitCode;
 #[command(
     name = "canonic",
     version,
-    about = "Versioned markdown canned responses for Jira: convert, lint, Heed+BM25 search"
+    about = "Versioned Jira canned responses: convert, quality check, Tantivy search/dedupe"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -27,54 +28,65 @@ enum Commands {
     Doctor,
     /// List canned responses in the corpus
     List {
-        /// Corpus directory (default: corpus/responses)
         #[arg(long)]
         corpus: Option<PathBuf>,
     },
-    /// Convert markdown to Jira/Confluence wiki markup via pandoc
-    Convert {
-        /// Path to a markdown file (or omit to convert all under --corpus)
-        path: Option<PathBuf>,
-        /// Corpus directory when converting all
+    /// Quality gate: resp- ids, prefix/sop front matter, personal sign-offs
+    Check {
         #[arg(long)]
         corpus: Option<PathBuf>,
-        /// Write output next to source as `.jira.txt` instead of stdout
+        #[arg(long)]
+        json: bool,
+    },
+    /// Convert markdown to Jira/Confluence wiki markup via pandoc
+    Convert {
+        path: Option<PathBuf>,
+        #[arg(long)]
+        corpus: Option<PathBuf>,
         #[arg(long)]
         write: bool,
     },
     /// Lint the corpus with Vale and/or Harper (harper-core in-process)
     Lint {
-        /// Corpus directory (default: corpus/responses)
         #[arg(long)]
         corpus: Option<PathBuf>,
-        /// Optional single file instead of whole corpus
         path: Option<PathBuf>,
-        /// Which engine(s) to run
         #[arg(long, value_enum, default_value_t = LintEngine::All)]
         engine: LintEngine,
-        /// Emit JSON report
         #[arg(long)]
         json: bool,
     },
-    /// Rebuild the Heed BM25 index from the markdown corpus
+    /// Rebuild the Tantivy index from the markdown corpus
     Reindex {
-        /// Corpus directory (default: corpus/responses)
         #[arg(long)]
         corpus: Option<PathBuf>,
-        /// Index directory (default: .canonic-index)
         #[arg(long)]
         index: Option<PathBuf>,
     },
-    /// BM25 search over the indexed corpus
+    /// BM25 full-text search over the indexed corpus
     Search {
-        /// Query string
         query: String,
-        /// Max hits
         #[arg(long, short = 'n', default_value_t = 10)]
         limit: usize,
-        /// Index directory (default: .canonic-index)
         #[arg(long)]
         index: Option<PathBuf>,
+    },
+    /// Near-duplicate detection (Tantivy self-query + jaccard in reason)
+    Dedupe {
+        #[arg(long)]
+        corpus: Option<PathBuf>,
+        #[arg(long)]
+        index: Option<PathBuf>,
+        /// Minimum Tantivy score to report a pair (tune after reindex)
+        #[arg(long, default_value_t = 1.0)]
+        threshold: f64,
+        #[arg(long, default_value_t = 8)]
+        per_doc: usize,
+        /// Rebuild index before scanning
+        #[arg(long)]
+        reindex: bool,
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -107,9 +119,30 @@ fn run() -> Result<ExitCode> {
                 println!("(no responses in {})", corpus.display());
             }
             for d in docs {
-                println!("{}\t{}\t{}", d.id, d.title, d.path.display());
+                let sop = d.sop.as_deref().unwrap_or("-");
+                println!(
+                    "{}\t{}\tsop={}\t{}",
+                    d.id,
+                    d.title,
+                    sop,
+                    d.path.display()
+                );
             }
             Ok(ExitCode::SUCCESS)
+        }
+        Commands::Check { corpus, json } => {
+            let corpus = corpus.unwrap_or_else(default_corpus_dir);
+            let report = check_corpus(&corpus)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print!("{}", format_check_report(&report));
+            }
+            if report.ok() {
+                Ok(ExitCode::SUCCESS)
+            } else {
+                Ok(ExitCode::from(1))
+            }
         }
         Commands::Convert {
             path,
@@ -213,6 +246,43 @@ fn run() -> Result<ExitCode> {
                     h.path.display(),
                     h.snippet
                 );
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::Dedupe {
+            corpus,
+            index,
+            threshold,
+            per_doc,
+            reindex: do_reindex,
+            json,
+        } => {
+            let corpus = corpus.unwrap_or_else(default_corpus_dir);
+            let index = index.unwrap_or_else(default_index_dir);
+            if do_reindex || !index.exists() {
+                let n = reindex(&corpus, &index)?;
+                eprintln!("reindexed {n} document(s) into {}", index.display());
+            }
+            let pairs = find_duplicates(&index, &corpus, threshold, per_doc)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&pairs)?);
+            } else if pairs.is_empty() {
+                println!(
+                    "(no near-duplicate pairs above threshold {threshold}; try lowering --threshold)"
+                );
+            } else {
+                for (i, p) in pairs.iter().enumerate() {
+                    println!(
+                        "{}. {} ↔ {}  score={:.4}\n   {}\n   {}\n   {}",
+                        i + 1,
+                        p.left_id,
+                        p.right_id,
+                        p.score,
+                        p.left_path,
+                        p.right_path,
+                        p.reason
+                    );
+                }
             }
             Ok(ExitCode::SUCCESS)
         }

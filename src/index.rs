@@ -1,19 +1,19 @@
-//! Heed-backed canned-response store with BM25 search.
+//! Tantivy-backed full-text index for search and near-duplicate detection.
 
 use crate::corpus::{walk_responses, CannedResponse};
-use anyhow::Result;
-use heed::types::{Bytes, Str};
-use heed::{Database, Env, EnvOpenOptions};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tantivy::collector::TopDocs;
+use tantivy::query::QueryParser;
+use tantivy::schema::{
+    Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, STORED, STRING,
+};
+use tantivy::{doc, Index, IndexWriter, ReloadPolicy, TantivyDocument};
 
-const MAP_SIZE: usize = 64 * 1024 * 1024; // 64 MiB enough for canned-response corpora
-const BM25_K1: f64 = 1.5;
-const BM25_B: f64 = 0.75;
-
-/// One indexed canned response (persisted as JSON in Heed).
+/// One document stored in the search index.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexDoc {
     pub id: String,
@@ -21,9 +21,10 @@ pub struct IndexDoc {
     pub content: String,
     pub path: String,
     pub tags: Vec<String>,
+    pub sop: Option<String>,
 }
 
-/// A ranked hit from BM25 over the local index.
+/// A ranked hit from Tantivy BM25 search.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchHit {
     pub id: String,
@@ -33,18 +34,57 @@ pub struct SearchHit {
     pub path: PathBuf,
 }
 
+/// A pair of near-duplicate responses for curation.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct DedupePair {
+    pub left_id: String,
+    pub right_id: String,
+    pub score: f64,
+    pub left_path: String,
+    pub right_path: String,
+    pub reason: String,
+}
+
 /// Default index directory (gitignored) under the working tree.
 pub fn default_index_dir() -> PathBuf {
     PathBuf::from(".canonic-index")
 }
 
-/// Tokenize for BM25: lowercase, split on non-alphanumeric.
-pub fn tokenize(text: &str) -> Vec<String> {
-    text.to_lowercase()
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|t| !t.is_empty())
-        .map(|s| s.to_string())
-        .collect()
+struct Fields {
+    id: Field,
+    title: Field,
+    body: Field,
+    path: Field,
+    tags: Field,
+    sop: Field,
+}
+
+fn build_schema() -> (Schema, Fields) {
+    let mut builder = Schema::builder();
+    let id = builder.add_text_field("id", STRING | STORED);
+    let text_indexing = TextFieldIndexing::default()
+        .set_tokenizer("default")
+        .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+    let text_opts = TextOptions::default()
+        .set_indexing_options(text_indexing)
+        .set_stored();
+    let title = builder.add_text_field("title", text_opts.clone());
+    let body = builder.add_text_field("body", text_opts.clone());
+    let path = builder.add_text_field("path", STRING | STORED);
+    let tags = builder.add_text_field("tags", text_opts);
+    let sop = builder.add_text_field("sop", STRING | STORED);
+    let schema = builder.build();
+    (
+        schema,
+        Fields {
+            id,
+            title,
+            body,
+            path,
+            tags,
+            sop,
+        },
+    )
 }
 
 impl From<&CannedResponse> for IndexDoc {
@@ -55,182 +95,138 @@ impl From<&CannedResponse> for IndexDoc {
             content: r.content.clone(),
             path: r.path.display().to_string(),
             tags: r.tags.clone(),
+            sop: r.sop.clone(),
         }
     }
 }
 
-fn open_env(index_dir: &Path) -> heed::Result<Env> {
-    fs::create_dir_all(index_dir).ok();
-    unsafe {
-        EnvOpenOptions::new()
-            .map_size(MAP_SIZE)
-            .max_dbs(4)
-            .open(index_dir)
+/// Tokenize for pure lexical helpers (tests / jaccard).
+pub fn tokenize(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Jaccard similarity over token sets (pure; used as a second signal for dedupe tests).
+pub fn jaccard_similarity(a: &str, b: &str) -> f64 {
+    let ta: HashSet<_> = tokenize(a).into_iter().collect();
+    let tb: HashSet<_> = tokenize(b).into_iter().collect();
+    if ta.is_empty() && tb.is_empty() {
+        return 1.0;
     }
+    if ta.is_empty() || tb.is_empty() {
+        return 0.0;
+    }
+    let inter = ta.intersection(&tb).count() as f64;
+    let union = ta.union(&tb).count() as f64;
+    inter / union
 }
 
-type DocDb = Database<Str, Bytes>;
-
-fn open_docs(env: &Env) -> heed::Result<DocDb> {
-    let mut wtxn = env.write_txn()?;
-    let db = env.create_database(&mut wtxn, Some("docs"))?;
-    wtxn.commit()?;
-    Ok(db)
-}
-
-/// Reindex all markdown responses under `corpus_dir` into Heed at `index_dir`.
+/// Reindex all markdown responses under `corpus_dir` into Tantivy at `index_dir`.
 /// Returns number of documents written.
 pub fn reindex(corpus_dir: &Path, index_dir: &Path) -> Result<usize> {
     let responses = walk_responses(corpus_dir)?;
-    let env = open_env(index_dir)?;
-    let db = open_docs(&env)?;
-    let mut wtxn = env.write_txn()?;
-
-    let keys: Vec<String> = db
-        .iter(&wtxn)?
-        .filter_map(|r| r.ok().map(|(k, _)| k.to_string()))
-        .collect();
-    for k in keys {
-        db.delete(&mut wtxn, &k)?;
+    if index_dir.exists() {
+        fs::remove_dir_all(index_dir)
+            .with_context(|| format!("clear old index {}", index_dir.display()))?;
     }
-
+    fs::create_dir_all(index_dir)?;
+    let (schema, fields) = build_schema();
+    let index = Index::create_in_dir(index_dir, schema)?;
+    let mut writer: IndexWriter = index.writer(50_000_000)?;
     let mut n = 0usize;
-    for r in responses {
-        let doc = IndexDoc::from(&r);
-        let bytes = serde_json::to_vec(&doc)?;
-        db.put(&mut wtxn, &doc.id, &bytes)?;
+    for r in &responses {
+        let tags = r.tags.join(" ");
+        let sop = r.sop.clone().unwrap_or_default();
+        writer.add_document(doc!(
+            fields.id => r.id.as_str(),
+            fields.title => r.title.as_str(),
+            fields.body => r.content.as_str(),
+            fields.path => r.path.display().to_string(),
+            fields.tags => tags.as_str(),
+            fields.sop => sop.as_str(),
+        ))?;
         n += 1;
     }
-    wtxn.commit()?;
+    writer.commit()?;
     Ok(n)
 }
 
-/// Load all docs from the Heed store.
-pub fn load_docs(index_dir: &Path) -> Result<Vec<IndexDoc>> {
+fn open_index(index_dir: &Path) -> Result<(Index, Fields)> {
     if !index_dir.exists() {
-        return Ok(vec![]);
+        bail!("index not found at {}", index_dir.display());
     }
-    let env = open_env(index_dir)?;
-    let db = open_docs(&env)?;
-    let rtxn = env.read_txn()?;
-    let mut docs = Vec::new();
-    for item in db.iter(&rtxn)? {
-        let (_k, v) = item?;
-        let doc: IndexDoc = serde_json::from_slice(v)?;
-        docs.push(doc);
-    }
-    Ok(docs)
+    let index = Index::open_in_dir(index_dir)
+        .with_context(|| format!("open tantivy index {}", index_dir.display()))?;
+    let schema = index.schema();
+    let fields = Fields {
+        id: schema.get_field("id")?,
+        title: schema.get_field("title")?,
+        body: schema.get_field("body")?,
+        path: schema.get_field("path")?,
+        tags: schema.get_field("tags")?,
+        sop: schema.get_field("sop")?,
+    };
+    Ok((index, fields))
 }
 
-/// BM25 score of query tokens against a document token list.
-pub fn bm25_score(
-    query_tokens: &[String],
-    doc_tokens: &[String],
-    avgdl: f64,
-    idf: &HashMap<String, f64>,
-) -> f64 {
-    if query_tokens.is_empty() || doc_tokens.is_empty() || avgdl <= 0.0 {
-        return 0.0;
-    }
-    let mut tf: HashMap<&str, f64> = HashMap::new();
-    for t in doc_tokens {
-        *tf.entry(t.as_str()).or_insert(0.0) += 1.0;
-    }
-    let dl = doc_tokens.len() as f64;
-    let mut score = 0.0;
-    for qt in query_tokens {
-        let f = *tf.get(qt.as_str()).unwrap_or(&0.0);
-        if f == 0.0 {
-            continue;
-        }
-        let idf_t = *idf.get(qt.as_str()).unwrap_or(&0.0);
-        let denom = f + BM25_K1 * (1.0 - BM25_B + BM25_B * (dl / avgdl));
-        score += idf_t * (f * (BM25_K1 + 1.0)) / denom;
-    }
-    score
+fn field_text(doc: &TantivyDocument, field: Field) -> String {
+    doc.get_first(field)
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
-fn build_idf(docs: &[Vec<String>]) -> (HashMap<String, f64>, f64) {
-    let n = docs.len() as f64;
-    let mut df: HashMap<String, f64> = HashMap::new();
-    let mut total_len = 0.0;
-    for d in docs {
-        total_len += d.len() as f64;
-        let mut seen = std::collections::HashSet::new();
-        for t in d {
-            if seen.insert(t.as_str()) {
-                *df.entry(t.clone()).or_insert(0.0) += 1.0;
-            }
-        }
-    }
-    let avgdl = if n > 0.0 { total_len / n } else { 0.0 };
-    let mut idf = HashMap::new();
-    for (term, dfi) in df {
-        // Robertson-Sparck Jones idf with +0.5 smoothing.
-        let val = ((n - dfi + 0.5) / (dfi + 0.5) + 1.0).ln();
-        idf.insert(term, val.max(0.0));
-    }
-    (idf, avgdl)
+/// Strip characters that break Tantivy's query parser; keep alphanumeric terms.
+pub fn sanitize_query(query: &str) -> String {
+    tokenize(query).join(" ")
 }
 
-fn doc_tokens(doc: &IndexDoc) -> Vec<String> {
-    let mut t = tokenize(&doc.id);
-    t.extend(tokenize(&doc.title));
-    t.extend(tokenize(&doc.content));
-    for tag in &doc.tags {
-        t.extend(tokenize(tag));
-    }
-    t
-}
-
-/// Search the Heed-backed corpus with BM25. Returns hits sorted by score desc.
+/// Search the Tantivy index with BM25. Returns hits sorted by score desc.
 pub fn search(index_dir: &Path, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
-    let docs = load_docs(index_dir)?;
-    search_docs(&docs, query, limit)
-}
-
-/// Pure BM25 over an in-memory doc list (unit-tested without Heed I/O).
-pub fn search_docs(docs: &[IndexDoc], query: &str, limit: usize) -> Result<Vec<SearchHit>> {
-    let q_tokens = tokenize(query);
-    if q_tokens.is_empty() {
+    let query = sanitize_query(query);
+    if query.is_empty() || limit == 0 {
         return Ok(vec![]);
     }
-    let tokenized: Vec<Vec<String>> = docs.iter().map(doc_tokens).collect();
-    let (idf, avgdl) = build_idf(&tokenized);
-    let mut hits: Vec<SearchHit> = docs
-        .iter()
-        .zip(tokenized.iter())
-        .filter_map(|(doc, toks)| {
-            let score = bm25_score(&q_tokens, toks, avgdl, &idf);
-            if score <= 0.0 {
-                return None;
-            }
-            Some(SearchHit {
-                id: doc.id.clone(),
-                score,
-                title: doc.title.clone(),
-                snippet: snippet_for(&doc.content, &q_tokens),
-                path: PathBuf::from(&doc.path),
-            })
-        })
-        .collect();
-    hits.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    hits.truncate(limit);
+    let (index, fields) = open_index(index_dir)?;
+    let reader = index
+        .reader_builder()
+        .reload_policy(ReloadPolicy::Manual)
+        .try_into()?;
+    let searcher = reader.searcher();
+    let parser = QueryParser::for_index(&index, vec![fields.title, fields.body, fields.tags]);
+    let q = parser
+        .parse_query(&query)
+        .with_context(|| format!("parse query {query:?}"))?;
+    let top = searcher.search(&q, &TopDocs::with_limit(limit))?;
+    let mut hits = Vec::new();
+    for (score, addr) in top {
+        let retrieved: TantivyDocument = searcher.doc(addr)?;
+        let id = field_text(&retrieved, fields.id);
+        let title = field_text(&retrieved, fields.title);
+        let body = field_text(&retrieved, fields.body);
+        let path = field_text(&retrieved, fields.path);
+        hits.push(SearchHit {
+            id,
+            score: score as f64,
+            title,
+            snippet: snippet_for(&body, &query),
+            path: PathBuf::from(path),
+        });
+    }
     Ok(hits)
 }
 
-fn snippet_for(text: &str, query_tokens: &[String]) -> String {
+fn snippet_for(text: &str, query: &str) -> String {
     let flat = text.replace('\n', " ");
     if flat.is_empty() {
         return String::new();
     }
     let lower = flat.to_lowercase();
     let mut pos = None;
-    for qt in query_tokens {
+    for qt in tokenize(query) {
         if let Some(i) = lower.find(qt.as_str()) {
             pos = Some(i);
             break;
@@ -254,6 +250,108 @@ fn snippet_for(text: &str, query_tokens: &[String]) -> String {
     s
 }
 
+/// Build a short self-query for near-duplicate search from a response.
+pub fn self_query_for(doc: &CannedResponse) -> String {
+    let mut parts = vec![doc.title.clone()];
+    let words: Vec<_> = doc
+        .content
+        .split_whitespace()
+        .filter(|w| w.len() > 3)
+        .take(40)
+        .map(|s| s.trim_matches(|c: char| !c.is_alphanumeric() && c != '-'))
+        .filter(|s| !s.is_empty())
+        .collect();
+    parts.push(words.join(" "));
+    parts.join(" ")
+}
+
+/// Find near-duplicate pairs using Tantivy self-queries plus optional Jaccard floor.
+///
+/// For each document, query the index with a content-derived query and flag other
+/// documents that rank above `score_threshold` (excluding self). Pairs are unique
+/// and ordered by score desc.
+pub fn find_duplicates(
+    index_dir: &Path,
+    corpus_dir: &Path,
+    score_threshold: f64,
+    per_doc_limit: usize,
+) -> Result<Vec<DedupePair>> {
+    let docs = walk_responses(corpus_dir)?;
+    let mut pairs: Vec<DedupePair> = Vec::new();
+    let mut seen_keys: HashSet<(String, String)> = HashSet::new();
+
+    for doc in &docs {
+        let q = self_query_for(doc);
+        if q.trim().is_empty() {
+            continue;
+        }
+        let hits = search(index_dir, &q, per_doc_limit.max(2))?;
+        for hit in hits {
+            if hit.id == doc.id {
+                continue;
+            }
+            if hit.score < score_threshold {
+                continue;
+            }
+            let (a, b) = if doc.id <= hit.id {
+                (doc.id.clone(), hit.id.clone())
+            } else {
+                (hit.id.clone(), doc.id.clone())
+            };
+            if !seen_keys.insert((a.clone(), b.clone())) {
+                continue;
+            }
+            let other = docs.iter().find(|d| d.id == hit.id);
+            let jacc = other
+                .map(|o| jaccard_similarity(&doc.content, &o.content))
+                .unwrap_or(0.0);
+            pairs.push(DedupePair {
+                left_id: a,
+                right_id: b,
+                score: hit.score,
+                left_path: doc.path.display().to_string(),
+                right_path: hit.path.display().to_string(),
+                reason: format!(
+                    "tantivy self-query hit score={:.3}; content jaccard={jacc:.3}",
+                    hit.score
+                ),
+            });
+        }
+    }
+    pairs.sort_by(|x, y| {
+        y.score
+            .partial_cmp(&x.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Ok(pairs)
+}
+
+/// Pure near-dup detection on an in-memory list via Jaccard (no Tantivy I/O).
+pub fn find_duplicates_jaccard(docs: &[CannedResponse], threshold: f64) -> Vec<DedupePair> {
+    let mut pairs = Vec::new();
+    for i in 0..docs.len() {
+        for j in (i + 1)..docs.len() {
+            let score = jaccard_similarity(&docs[i].content, &docs[j].content);
+            if score >= threshold {
+                pairs.push(DedupePair {
+                    left_id: docs[i].id.clone(),
+                    right_id: docs[j].id.clone(),
+                    score,
+                    left_path: docs[i].path.display().to_string(),
+                    right_path: docs[j].path.display().to_string(),
+                    reason: format!("content jaccard={score:.3}"),
+                });
+            }
+        }
+    }
+    pairs.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    pairs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,96 +360,133 @@ mod tests {
     #[test]
     fn tokenize_splits_and_lowercases() {
         assert_eq!(
-            tokenize("Hello, VPN-Access!"),
-            vec!["hello", "vpn", "access"]
+            tokenize("Hello, Project-Space!"),
+            vec!["hello", "project", "space"]
         );
     }
 
     #[test]
-    fn bm25_ranks_relevant_doc_first() {
-        let docs = vec![
-            IndexDoc {
-                id: "password-reset".into(),
-                title: "Password reset self-service".into(),
-                content: "use the self-service portal to reset your account password".into(),
-                path: "password-reset.md".into(),
-                tags: vec!["password".into()],
-            },
-            IndexDoc {
-                id: "vpn-access".into(),
-                title: "Corporate VPN onboarding".into(),
-                content: "install wireguard profile corporate for remote network access vpn_dns_failure"
-                    .into(),
-                path: "vpn-access.md".into(),
-                tags: vec!["vpn".into()],
-            },
-            IndexDoc {
-                id: "license-renewal".into(),
-                title: "Software license renewal".into(),
-                content: "procurement request with vendor quote and LICENSE_RUSH subject".into(),
-                path: "license-renewal.md".into(),
-                tags: vec!["license".into()],
-            },
-        ];
-        let hits = search_docs(&docs, "wireguard vpn_dns_failure corporate", 5).unwrap();
-        assert!(!hits.is_empty());
-        assert_eq!(hits[0].id, "vpn-access");
-        assert!(hits[0].score > 0.0);
-        // Relevant should outrank password-reset for this query
-        if hits.len() > 1 {
-            assert!(hits[0].score >= hits[1].score);
-        }
+    fn jaccard_high_for_near_duplicates() {
+        let a = "project space is not a backup or archive on demo";
+        let b = "project space is not a backup archive for demo users";
+        let c = "small compute request needs an sbu calculation for gpu nodes";
+        assert!(jaccard_similarity(a, b) > jaccard_similarity(a, c));
+        assert!(jaccard_similarity(a, b) > 0.3);
     }
 
     #[test]
-    fn reindex_and_search_roundtrip_on_disk() {
+    fn reindex_and_search_ranks_project_space_query() {
         let dir = tempfile::tempdir().unwrap();
         let corpus = dir.path().join("responses");
         fs::create_dir_all(&corpus).unwrap();
-        let mut hit = fs::File::create(corpus.join("hit.md")).unwrap();
-        writeln!(
-            hit,
-            "---\nid: unique-hit\ntitle: Unique Hit\n---\n\nunique_zxqword appears only here\n"
+        fs::write(
+            corpus.join("resp-project-space-not-backup.md"),
+            "---\nid: resp-project-space-not-backup\ntitle: Project space is not a backup\nprefix: resp\nsop: none\n---\n\nProject space is not a backup or archive. Use tape for long-term retention.\n",
         )
         .unwrap();
         fs::write(
-            corpus.join("miss.md"),
-            "---\nid: miss\ntitle: Miss\n---\n\ntotally unrelated cooking recipes\n",
+            corpus.join("resp-small-compute-sbu-calculation.md"),
+            "---\nid: resp-small-compute-sbu-calculation\ntitle: SBU calculation\nprefix: resp\nsop: none\n---\n\nSmall compute needs an SBU calculation for GPU and CPU hours.\n",
         )
         .unwrap();
 
         let idx = dir.path().join("index");
         let n = reindex(&corpus, &idx).unwrap();
         assert_eq!(n, 2);
-        let hits = search(&idx, "unique_zxqword", 10).unwrap();
-        assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].id, "unique-hit");
+        let hits = search(&idx, "project space backup archive tape", 5).unwrap();
+        assert!(!hits.is_empty());
+        assert_eq!(hits[0].id, "resp-project-space-not-backup");
         assert!(hits[0].score > 0.0);
     }
 
     #[test]
-    fn empty_query_returns_no_hits() {
-        let docs = vec![IndexDoc {
-            id: "x".into(),
-            title: "X".into(),
-            content: "hello".into(),
-            path: "x.md".into(),
-            tags: vec![],
-        }];
-        let hits = search_docs(&docs, "   ", 5).unwrap();
-        assert!(hits.is_empty());
+    fn find_duplicates_flags_near_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let corpus = dir.path().join("responses");
+        fs::create_dir_all(&corpus).unwrap();
+        let body = "Project space on the cluster is user-managed working storage and not a backup system for research data that must be archived to tape.";
+        fs::write(
+            corpus.join("resp-a.md"),
+            format!("---\nid: resp-a\ntitle: Project space note A\nprefix: resp\nsop: none\n---\n\n{body}\n"),
+        )
+        .unwrap();
+        fs::write(
+            corpus.join("resp-b.md"),
+            format!("---\nid: resp-b\ntitle: Project space note B\nprefix: resp\nsop: none\n---\n\n{body} Please confirm your backup plan.\n"),
+        )
+        .unwrap();
+        fs::write(
+            corpus.join("resp-c.md"),
+            "---\nid: resp-c\ntitle: Unrelated SBU math\nprefix: resp\nsop: none\n---\n\nGPU hours and thin node SBU rates for small compute grants.\n",
+        )
+        .unwrap();
+
+        let idx = dir.path().join("index");
+        reindex(&corpus, &idx).unwrap();
+        // Low threshold so near-copies surface; unrelated should not pair with them at high score.
+        let pairs = find_duplicates(&idx, &corpus, 0.1, 5).unwrap();
+        assert!(
+            pairs.iter().any(|p| {
+                (p.left_id == "resp-a" && p.right_id == "resp-b")
+                    || (p.left_id == "resp-b" && p.right_id == "resp-a")
+            }),
+            "expected a/b pair, got {pairs:?}"
+        );
     }
 
     #[test]
-    fn zero_limit_returns_no_hits() {
-        let docs = vec![IndexDoc {
-            id: "x".into(),
-            title: "X".into(),
-            content: "hello searchable content".into(),
-            path: "x.md".into(),
-            tags: vec![],
-        }];
-        let hits = search_docs(&docs, "searchable", 0).unwrap();
-        assert!(hits.is_empty());
+    fn jaccard_dedupe_pure_path() {
+        let docs = vec![
+            CannedResponse {
+                id: "resp-a".into(),
+                title: "A".into(),
+                prefix: Some("resp".into()),
+                sop: Some("none".into()),
+                body: String::new(),
+                content: "alpha beta gamma delta shared tokens for test".into(),
+                path: PathBuf::from("a.md"),
+                tags: vec![],
+            },
+            CannedResponse {
+                id: "resp-b".into(),
+                title: "B".into(),
+                prefix: Some("resp".into()),
+                sop: Some("none".into()),
+                body: String::new(),
+                content: "alpha beta gamma delta shared tokens for test again".into(),
+                path: PathBuf::from("b.md"),
+                tags: vec![],
+            },
+            CannedResponse {
+                id: "resp-c".into(),
+                title: "C".into(),
+                prefix: Some("resp".into()),
+                sop: Some("none".into()),
+                body: String::new(),
+                content: "completely different vocabulary about licensing".into(),
+                path: PathBuf::from("c.md"),
+                tags: vec![],
+            },
+        ];
+        let pairs = find_duplicates_jaccard(&docs, 0.5);
+        assert_eq!(pairs.len(), 1);
+        assert!(pairs[0].left_id == "resp-a" || pairs[0].right_id == "resp-a");
+    }
+
+    #[test]
+    fn empty_query_returns_no_hits() {
+        let dir = tempfile::tempdir().unwrap();
+        let corpus = dir.path().join("responses");
+        fs::create_dir_all(&corpus).unwrap();
+        let mut f = fs::File::create(corpus.join("resp-x.md")).unwrap();
+        writeln!(
+            f,
+            "---\nid: resp-x\ntitle: X\nprefix: resp\nsop: none\n---\n\nhello searchable\n"
+        )
+        .unwrap();
+        let idx = dir.path().join("index");
+        reindex(&corpus, &idx).unwrap();
+        assert!(search(&idx, "   ", 5).unwrap().is_empty());
+        assert!(search(&idx, "searchable", 0).unwrap().is_empty());
     }
 }

@@ -1,42 +1,45 @@
 # canonic
 
-**Canonical** canned-response corpus for a Jira instance: version-controlled **markdown** is the source of truth. Convert to Jira/Confluence wiki markup with **pandoc**, lint with **Vale** and **Harper** (in-process `harper-core`, optional CLI), and search the corpus with a local **Heed** store ranked by **BM25**.
+**Canonical** canned-response corpus for Jira Jira work: version-controlled **markdown** under a shared **`resp-`** prefix is the source of truth. Convert with **pandoc**, enforce **quality checks** before migration, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
 
 ## Requirements
 
 | Tool | Role |
 |------|------|
 | [Rust](https://rustup.rs/) (1.75+) | Build the CLI |
-| [pandoc](https://pandoc.org/) | `convert` — markdown → `jira` writer markup (check with `canonic doctor`) |
-| [Vale](https://vale.sh/) | `lint --engine vale` — prose style (optional) |
-| [Harper](https://writewithharper.com/) | Grammar via **in-process `harper-core`** (always linked); optional `harper-cli` / `harper` on `PATH` as an extra pass |
+| [pandoc](https://pandoc.org/) | `convert` — markdown → `jira` writer |
+| [Vale](https://vale.sh/) | optional style lint |
+| Harper | **in-process `harper-core`** (linked); optional CLI on `PATH` |
 
-Missing optional tools produce an **explicit** message; the CLI does not panic or silently no-op. Harper grammar does **not** require a binary on `PATH`.
-
-## Corpus layout
+## Corpus layout (Support `resp` prefix)
 
 ```
 corpus/responses/
-  password-reset.md
-  vpn-access.md
-  license-renewal.md
+  resp-project-space-not-backup.md
+  resp-small-compute-sbu-calculation.md
+  ...
 ```
 
-Each file may use optional YAML front matter:
+Front matter convention (enforced by `canonic check`):
 
 ```markdown
 ---
-id: password-reset
-title: Password reset self-service
-tags: [account, password]
+id: resp-project-space-not-backup
+title: Project space is not a backup or archive
+prefix: resp
+tags: [storage, project-space]
+sop: none
 ---
-
-# Password reset self-service
-
-Body in normal Markdown…
 ```
 
-The markdown tree is the **source of truth**. The local BM25 index under `.canonic-index/` is generated and gitignored.
+- `id` and filename stem must match and start with `resp-`
+- `prefix: resp` required (shared advisor library; no personal prefixes)
+- `sop:` required — Confluence URL or literal `none`
+- Closings must be team-generic (e.g. `Support Team`), not personal names
+
+Samples are drafted from the 2026-07-06 team onboarding / HPC advisors meeting (project space, SBU math, top-up/extension, local-facilities data collection, GPFS triage, account permission).
+
+The Tantivy index under `.canonic-index/` is generated and gitignored.
 
 ## Build
 
@@ -47,45 +50,32 @@ cargo build --release
 ## Usage
 
 ```bash
-# Tool health (pandoc / vale / harper-cli / harper-core)
 canonic doctor
-
-# List responses
 canonic list
-canonic list --corpus corpus/responses
-
-# Convert one file (or whole corpus) to Jira wiki markup via pandoc
-canonic convert corpus/responses/password-reset.md
-canonic convert --write                    # writes *.jira.txt beside sources
-canonic convert --corpus corpus/responses
-
-# Lint: Vale (subprocess if present) + Harper (in-process harper-core)
-canonic lint
-canonic lint --engine vale
+canonic check                          # quality gate (exit 1 on findings)
+canonic convert corpus/responses/resp-project-space-not-backup.md
 canonic lint --engine harper
-canonic lint --json
 
-# Rebuild Heed index and BM25 search
 canonic reindex
-canonic search "wireguard vpn"
-canonic search "password reset" -n 5
+canonic search "project space backup"
+canonic dedupe --reindex --threshold 1.0
+canonic dedupe --threshold 0.5 --json
 ```
 
-### Doctor exit codes
+### Dedupe
 
-- `0` — pandoc present (convert workflow unblocked); other tools may still be `MISSING`
-- `1` — pandoc missing (critical for `convert`)
+`dedupe` rebuilds or reuses the Tantivy index, then for each response runs a self-query (title + content terms) and reports other documents that rank above `--threshold`. Pair reasons include the Tantivy score and a content **Jaccard** similarity for a second opinion. Use a high threshold to list only strong near-copies when curating the library before a Jira migration.
 
-### Harper: in-process vs CLI
+### Doctor / check exit codes
 
-- **Default / primary:** `harper-core` linked into the binary — `canonic lint --engine harper` works with no Harper install.
-- **Optional:** if `harper-cli`, `harper`, or `harperls` is on `PATH`, that CLI is also invoked and its findings are merged.
+- `doctor`: `1` if pandoc missing (convert blocked)
+- `check`: `1` if any quality finding
 
 ## Design notes
 
-- **BM25** (lexical relevance), not neural embeddings.
-- Subprocess integration for **pandoc** and **Vale**; **Harper** primarily in-process.
-- Index/search logic is unit-tested without external tools.
+- **Tantivy BM25** for search and near-duplicate discovery (better fit for curation/dedupe than a hand-rolled store).
+- Markdown remains the source of truth; Jira is a publication surface (API sync still future work).
+- Quality checks implement the meeting rule: **review before migration**, shared `resp` prefix only.
 
 ## License
 

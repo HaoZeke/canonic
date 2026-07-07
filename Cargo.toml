@@ -2,7 +2,7 @@
 name = "canonic"
 version = "0.1.0"
 edition = "2021"
-description = "Versioned Jira canned-response corpus: markdown source of truth, pandoc jira convert, Vale/Harper lint, Heed+BM25 search"
+description = "Versioned Jira Jira canned-response corpus: markdown source of truth, pandoc jira convert, quality checks, Tantivy search/dedupe"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/HaoZeke/canonic"
@@ -15,9 +15,10 @@ path = "src/main.rs"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 harper-core = "2.5"
-heed = "0.21"
+regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tantivy = "0.22"
 thiserror = "2"
 walkdir = "2"
 
