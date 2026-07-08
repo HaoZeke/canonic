@@ -131,13 +131,19 @@ JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIR
 
 `import-jira <jql>` searches Jira via its representational state transfer (REST) API v2 (`/rest/api/2/search`, then `/rest/api/2/issue/{key}/comment` per result), converts each comment's wiki markup back to markdown with pandoc, and writes one draft file per issue under `corpus/imports/` — never directly into `corpus/responses/`, since a human still has to pick the real answer, assign a clean `id`, and set `sop`. `--dry-run` lists which issues canonic would import, without fetching comments.
 
-Against a disposable Jira REST v2 fixture (podman/docker; seeds meeting-shaped messy canned comments under `labels = canned-response`):
+**Live smoke (official Atlassian Jira Software):** on a host with podman/docker and a few GB free RAM:
+
+```bash
+./scripts/jira-real/run-import-smoke.sh
+```
+
+That pulls `atlassian/jira-software:9.12.15`, classic-setup with Atlassian’s published short-lived **developer timebomb** license (not a free product entitlement — Server/Data Center is trial/paid; the key is only for local testing), seeds `HSP` issues with `canned-response` labels and wiki-markup comments (meeting-shaped personal sign-offs), runs `canonic import-jira`, then removes the container/volume. Takes several minutes on first boot.
+
+**Faster fixture** (REST-only stand-in, no full product):
 
 ```bash
 ./scripts/jira-fixture/run-import-smoke.sh
 ```
-
-That builds a tiny container, runs dry-run + Basic + Bearer import, checks pandoc convert, then removes the container (set `CANONIC_JIRA_SMOKE_TRASH=0` to keep the workdir for inspection).
 
 Authentication reads from the environment:
 
