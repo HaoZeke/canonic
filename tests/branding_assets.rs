@@ -93,3 +93,18 @@ fn docs_requirements_and_build_entry_exist() {
     assert!(script.contains("sphinx-build"));
     assert!(script.contains("shibuya") || script.contains("Shibuya"));
 }
+
+#[test]
+fn landing_page_has_product_ux_structure() {
+    let index = fs::read_to_string(repo_root().join("docs/source/index.rst")).unwrap();
+    assert!(index.contains("cn-hero"), "landing hero class");
+    assert!(index.contains("cn-hero-cta") || index.contains("cn-btn"), "hero CTAs");
+    assert!(index.contains("cn-flow"), "workflow flow strip");
+    assert!(index.contains("grid-item-card"), "sphinx-design cards");
+    assert!(index.contains("cn-steps"), "numbered first-response steps");
+    let css = fs::read_to_string(static_dir().join("custom.css")).unwrap();
+    assert!(css.len() > 1500, "custom.css should be a real brand layer");
+    assert!(css.contains(".cn-hero") && css.contains(".cn-flow") && css.contains(".cn-btn"));
+    let usage = fs::read_to_string(repo_root().join("docs/source/usage.rst")).unwrap();
+    assert!(usage.contains("cn-page-intro") && usage.contains("cn-cmd-list"));
+}

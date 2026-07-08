@@ -45,6 +45,14 @@ html_theme_options = {
         {"title": "Usage", "url": "usage"},
         {"title": "Design", "url": "design"},
     ],
+    "globaltoc_expand_depth": 1,
+}
+
+html_meta = {
+    "description": (
+        "canonic — versioned Jira canned-response corpus for Jira: "
+        "markdown under resp-, pandoc convert, quality checks, Tantivy search."
+    ),
 }
 
 # Copybutton: skip prompts in console blocks
