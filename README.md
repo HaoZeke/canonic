@@ -223,6 +223,31 @@ Optional developer smoke (not required for normal install). Passwords in these s
 
 Pulls `atlassian/jira-software:9.12.15`, classic-setup with Atlassian’s published short-lived **developer timebomb** license (Server/Data Center is trial/paid; the key is for local testing only), seeds `HSP` issues with `canned-response` labels and wiki-markup comments, runs `canonic import-jira`, then removes the container/volume.
 
+
+### Jira smoke tests (Docker / Nix)
+
+Free-tier REST fixture (no Marketplace apps):
+
+```bash
+# local / CI helper (podman or docker)
+cargo build --release
+./scripts/ci/jira-docker-smoke.sh
+```
+
+Optional Nix image for the same fixture:
+
+```bash
+nix --extra-experimental-features 'nix-command flakes' build .#jira-fixture-image
+docker load < result
+./scripts/ci/jira-docker-smoke.sh
+```
+
+Official Atlassian Jira Software (heavy; needs several GB RAM, developer timebomb license):
+
+```bash
+./scripts/jira-real/run-import-smoke.sh
+```
+
 **Faster fixture** (REST-only stand-in):
 
 ```bash

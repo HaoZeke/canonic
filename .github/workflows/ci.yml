@@ -41,11 +41,49 @@ jobs:
           set -euo pipefail
           ./target/release/canonic list
           ./target/release/canonic check
-          # In-process harper-core only (Vale may be absent on the runner).
           ./target/release/canonic lint --engine harper
-          # Convert/render smoke: non-empty jira body from the seeded sample.
           sample=corpus/responses/resp-demo-shared-quota.md
           test -f "$sample"
           out=$(./target/release/canonic convert "$sample")
           test -n "$out"
           echo "$out" | head -n 5
+
+      - name: Public leak scan (zero org branding)
+        run: cargo test --locked --test public_leak_scan
+
+  jira-docker:
+    name: jira free REST via Docker fixture
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Build canonic release
+        run: cargo build --locked --release --bin canonic
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-24.11
+
+      - name: Build jira-fixture image with Nix (dockerTools)
+        run: |
+          set -euo pipefail
+          nix --extra-experimental-features 'nix-command flakes' \
+            build .#jira-fixture-image -o /tmp/canonic-jira-fixture-image
+          # dockerTools result is a gzipped docker archive symlink
+          ls -la /tmp/canonic-jira-fixture-image
+          docker load < /tmp/canonic-jira-fixture-image
+          docker images | head -20
+
+      - name: Smoke probe/import/comment against fixture container
+        env:
+          CANONIC_BIN: ${{ github.workspace }}/target/release/canonic
+          CANONIC_JIRA_FIXTURE_PORT: "18081"
+        run: ./scripts/ci/jira-docker-smoke.sh

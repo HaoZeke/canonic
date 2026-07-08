@@ -434,3 +434,28 @@ team merge-request review on self-hosted GitLab:
    CANONIC_GITLAB_REMOTE=git@gitlab.example:group/canonic.git scripts/mirror-to-gitlab.sh
 
 Pass a branch name as the first argument to override the current branch.
+
+
+Jira smoke (Docker / Nix)
+-------------------------
+
+CI and local free-tier smoke (fixture container, no Marketplace apps):
+
+.. code:: shell
+
+   cargo build --release
+   ./scripts/ci/jira-docker-smoke.sh
+
+Nix dockerTools image:
+
+.. code:: shell
+
+   nix build .#jira-fixture-image
+   docker load < result
+   ./scripts/ci/jira-docker-smoke.sh
+
+Heavy official Atlassian Jira Software (developer timebomb; multi-GB RAM):
+
+.. code:: shell
+
+   ./scripts/jira-real/run-import-smoke.sh

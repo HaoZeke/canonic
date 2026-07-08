@@ -263,6 +263,22 @@ fn ci_workflow_runs_cargo_test() {
         ci.contains("corpus/responses"),
         "CI corpus gate must target corpus/responses"
     );
+    assert!(
+        ci.contains("jira-docker") || ci.contains("jira-docker-smoke"),
+        "CI must run a Docker-based free Jira REST smoke"
+    );
+    assert!(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("scripts/ci/jira-docker-smoke.sh")
+            .is_file(),
+        "missing scripts/ci/jira-docker-smoke.sh"
+    );
+    assert!(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("flake.nix")
+            .is_file(),
+        "missing flake.nix for nix dockerTools fixture image"
+    );
 }
 
 #[test]

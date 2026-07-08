@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Spin official Atlassian Jira Software (podman/docker), classic setup with the
 # public 3-hour Jira Software Data Center timebomb license from Atlassian's
-# Marketplace developer docs, seed meeting-shaped issues, run canonic
+# Marketplace developer docs, seed demo-shaped issues, run canonic
 # import-jira, then tear everything down.
 #
 # Usage (preferably on a remote builder with podman):
@@ -59,7 +59,7 @@ export JIRA_EMAIL=admin
 export JIRA_API_TOKEN='CanonicAdmin!2026'
 # bootstrap sets admin CanonicAdmin!2026 + completes classic setup
 python3 "$ROOT/scripts/jira-real/bootstrap.py" "$JIRA_BASE_URL"
-# seed meeting-shaped HSP issues (idempotent if already present)
+# seed demo-shaped HSP issues (idempotent if already present)
 python3 "$ROOT/scripts/jira-real/seed_issues.py"
 
 if [[ ! -x "$BIN" ]]; then
