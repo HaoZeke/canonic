@@ -68,8 +68,6 @@ if [[ ! -x "$BIN" ]]; then
   BIN="$ROOT/target/release/canonic"
 fi
 
-export JIRA_EMAIL=admin
-export JIRA_API_TOKEN='CanonicAdmin!2026'
 JQL='project = HSP AND labels = canned-response'
 mkdir -p "$OUT"
 
