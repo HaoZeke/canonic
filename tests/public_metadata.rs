@@ -251,6 +251,18 @@ fn ci_workflow_runs_cargo_test() {
         "CI should run on push/PR"
     );
     assert!(ci.contains("ubuntu-latest") || ci.contains("runs-on:"));
+    assert!(
+        ci.contains("canonic check") || ci.contains("./target/release/canonic check"),
+        "CI must gate published corpus with canonic check"
+    );
+    assert!(
+        ci.contains("lint --engine harper") || ci.contains("lint"),
+        "CI must run corpus lint (harper in-process)"
+    );
+    assert!(
+        ci.contains("corpus/responses"),
+        "CI corpus gate must target corpus/responses"
+    );
 }
 
 #[test]

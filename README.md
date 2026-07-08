@@ -45,47 +45,46 @@ cargo build --release
 
 ## Tutorial: your first canned response
 
-`corpus/responses/` starts empty (only a `.gitkeep` placeholder), so every response your team publishes comes from a reviewed answer. This walks through adding one.
+Published answers live under `corpus/responses/` (a seeded sample ships so `list` / `check` / convert work on a clean clone). Prefer the scaffold CLI over hand-copying front matter.
 
-1. Create `corpus/responses/resp-example-topic.md`:
-
-   ```markdown
-   ---
-   id: resp-example-topic
-   title: Example topic
-   prefix: resp
-   tags: [example]
-   sop: none
-   ---
-
-   # Example topic
-
-   Replace this with the real advisor answer.
-
-   Regards,
-   Support Team
-   ```
-
-2. Validate the front matter and closing:
+1. Scaffold a check-clean draft:
 
    ```bash
-   cargo run -- check
+   canonic new "Example topic" --tags example
+   # → corpus/responses/resp-example-topic.md
    ```
 
-3. Index it and search:
+2. Edit the body, then validate:
 
    ```bash
-   cargo run -- reindex
-   cargo run -- search "example topic"
+   canonic check
+   canonic lint --engine harper
    ```
 
-4. Convert to Jira wiki markup (requires pandoc):
+3. Index and search:
 
    ```bash
-   cargo run -- convert corpus/responses/resp-example-topic.md
+   canonic reindex
+   canonic search "example topic"
    ```
 
-Delete `resp-example-topic.md` once you commit a real response under its own id; it exists only to teach the format.
+4. Convert to Jira wiki markup (requires pandoc), or post explicitly:
+
+   ```bash
+   canonic convert corpus/responses/resp-example-topic.md
+   canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
+   ```
+
+**Import → review → promote:** pull existing Jira comments as drafts (never auto-published), edit, then promote:
+
+```bash
+canonic import-jira "project = HSP AND labels = canned-response"
+# edit corpus/imports/resp-….md until check-clean
+canonic promote corpus/imports/resp-….md
+canonic check
+```
+
+Agent day-to-day loop: install the in-repo skill at `.agents/skills/canonic-canned-loop/` (see that `SKILL.md`).
 
 ## Corpus layout (`resp` prefix)
 
@@ -119,9 +118,10 @@ sop: none
 ```bash
 canonic doctor
 canonic list
+canonic new "Project space is not a backup" --tags storage
 canonic check                          # quality gate (exit 1 on findings)
-canonic convert corpus/responses/resp-example-topic.md
-canonic lint --engine harper
+canonic lint --engine harper           # in-process harper-core (CI uses this)
+canonic convert corpus/responses/resp-project-space-is-not-a-backup.md
 
 canonic reindex
 canonic search "project space backup"
@@ -130,6 +130,7 @@ canonic dedupe --threshold 0.5 --json
 
 JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
   canonic import-jira "project = HSP AND labels = canned-response" --dry-run
+canonic promote corpus/imports/resp-some-topic-hsp-101.md
 ```
 
 ### Dedupe

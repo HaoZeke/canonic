@@ -54,8 +54,9 @@ Command map
       .. raw:: html
 
          <ul class="cn-cmd-list">
+           <li>canonic new "Title"<span class="cn-cmd-hint">scaffold resp- template</span></li>
+           <li>canonic promote PATH.md<span class="cn-cmd-hint">import → responses after check</span></li>
            <li>canonic jira-probe<span class="cn-cmd-hint">myself · free platform only</span></li>
-           <li>canonic import-jira "JQL" --dry-run</li>
            <li>canonic import-jira "JQL"<span class="cn-cmd-hint">drafts under corpus/imports/</span></li>
            <li>canonic jira-comment --issue KEY PATH.md<span class="cn-cmd-hint">explicit POST comment</span></li>
          </ul>
@@ -67,9 +68,10 @@ Full paste-ready session
 
    canonic doctor
    canonic list
+   canonic new "Example topic" --tags example
    canonic check
-   canonic convert corpus/responses/resp-example-topic.md
    canonic lint --engine harper
+   canonic convert corpus/responses/resp-project-space-is-not-a-backup.md
 
    canonic reindex
    canonic search "project space backup"
@@ -80,7 +82,9 @@ Full paste-ready session
    JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
      canonic jira-probe
    canonic import-jira "project = HSP AND labels = canned-response" --dry-run
-   canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
+   canonic promote corpus/imports/resp-example-hsp-101.md
+   canonic jira-comment --issue HSP-101 \
+     corpus/responses/resp-project-space-is-not-a-backup.md --dry-run
 
 Corpus layout
 -------------

@@ -5,7 +5,7 @@ Design notes
 
    <div class="cn-page-intro">
      <p>Three deliberate choices: markdown as the only source of truth, a local
-     search index for curation, and never auto-writing Jira.</p>
+     search index for curation, and no unattended bulk write into Jira.</p>
    </div>
 
 .. raw:: html
@@ -13,9 +13,9 @@ Design notes
    <ul class="cn-principles">
      <li>
        <h3>Markdown is canonical</h3>
-       <p>Jira is a publication surface. <code>convert</code> emits wiki markup for a human
-       to paste; <code>import-jira</code> only writes review drafts under
-       <code>corpus/imports/</code>.</p>
+       <p>Jira is a publication surface. <code>convert</code> emits wiki markup for paste-in
+       or one-shot <code>jira-comment</code>; <code>import-jira</code> only writes review drafts under
+       <code>corpus/imports/</code> until <code>promote</code>.</p>
      </li>
      <li>
        <h3>Tantivy BM25 for curation</h3>
@@ -25,16 +25,20 @@ Design notes
      <li>
        <h3>Review before migrate</h3>
        <p>Quality checks encode the meeting rule: shared <code>resp</code> prefix only,
-       valid front matter, team-generic closings — gate the library before Jira.</p>
+       valid front matter, team-generic closings — gate the library before Jira.
+       CI runs <code>check</code> and in-process Harper on published responses.</p>
      </li>
    </ul>
 
 What canonic does **not** do
 ----------------------------
 
-- It does **not** open, edit, or comment on Jira issues for you.
-- It does **not** promote ``corpus/imports/`` drafts into ``corpus/responses/``.
+- It does **not** bulk-sync the whole library into Jira (``jira-comment`` is
+  one file → one issue, human-gated).
+- It does **not** auto-publish imports: drafts stay under ``corpus/imports/``
+  until a human runs ``promote`` after ``check``.
 - It does **not** replace human judgment on which answer is the team standard.
+- It does **not** call paid Marketplace or JSM canned-response admin APIs.
 
 Citation
 --------

@@ -11,6 +11,7 @@ use canonic::jira_import::{
     probe_jira, CommentBodyFormat, JiraConfig,
 };
 use canonic::lint::{format_report, lint_paths, LintEngine};
+use canonic::scaffold::{promote_to_corpus, write_scaffold, ScaffoldOptions};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -34,6 +35,37 @@ enum Commands {
     List {
         #[arg(long)]
         corpus: Option<PathBuf>,
+    },
+    /// Scaffold a new check-clean `resp-` response from a title (template)
+    New {
+        /// Human title (also used for the H1 and default id slug)
+        title: String,
+        /// Explicit id (`resp-…`); default: `resp-<slug of title>`
+        #[arg(long)]
+        id: Option<String>,
+        /// Front-matter sop (Confluence URL or `none`)
+        #[arg(long, default_value = "none")]
+        sop: String,
+        /// Comma-separated tags
+        #[arg(long, default_value = "")]
+        tags: String,
+        /// Output directory (default: corpus/responses)
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Replace an existing file with the same id
+        #[arg(long)]
+        force: bool,
+    },
+    /// Promote a reviewed import draft into the published corpus after quality check
+    Promote {
+        /// Path to a draft under corpus/imports/ (or any check-clean markdown)
+        path: PathBuf,
+        /// Published corpus directory (default: corpus/responses)
+        #[arg(long)]
+        corpus: Option<PathBuf>,
+        /// Replace an existing published response with the same id
+        #[arg(long)]
+        force: bool,
     },
     /// Quality gate: resp- ids, prefix/sop front matter, personal sign-offs
     Check {
@@ -182,6 +214,42 @@ fn run() -> Result<ExitCode> {
                     d.path.display()
                 );
             }
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::New {
+            title,
+            id,
+            sop,
+            tags,
+            out,
+            force,
+        } => {
+            let out_dir = out.unwrap_or_else(default_corpus_dir);
+            let tag_list: Vec<String> = tags
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect();
+            let opts = ScaffoldOptions {
+                title,
+                id,
+                sop,
+                tags: tag_list,
+                body: None,
+            };
+            let path = write_scaffold(&out_dir, &opts, force)?;
+            println!("scaffolded {}", path.display());
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::Promote {
+            path,
+            corpus,
+            force,
+        } => {
+            let dest_dir = corpus.unwrap_or_else(default_corpus_dir);
+            let dest = promote_to_corpus(&path, &dest_dir, force)?;
+            println!("promoted {} → {}", path.display(), dest.display());
             Ok(ExitCode::SUCCESS)
         }
         Commands::Check { corpus, json } => {

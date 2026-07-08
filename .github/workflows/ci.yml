@@ -35,3 +35,17 @@ jobs:
           cargo build --locked --release --bin canonic
           ./target/release/canonic --help
           ./target/release/canonic doctor
+
+      - name: Corpus quality gate (published responses)
+        run: |
+          set -euo pipefail
+          ./target/release/canonic list
+          ./target/release/canonic check
+          # In-process harper-core only (Vale may be absent on the runner).
+          ./target/release/canonic lint --engine harper
+          # Convert/render smoke: non-empty jira body from the seeded sample.
+          sample=corpus/responses/resp-project-space-is-not-a-backup.md
+          test -f "$sample"
+          out=$(./target/release/canonic convert "$sample")
+          test -n "$out"
+          echo "$out" | head -n 5

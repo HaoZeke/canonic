@@ -13,6 +13,7 @@
 //! | [`lint`] | Vale CLI + in-process Harper |
 //! | [`doctor`] | Tooling probes |
 //! | [`jira_import`] | Free REST probe, read import, explicit comment POST |
+//! | [`scaffold`] | New `resp-` templates and promote import → responses |
 //!
 //! ## Example
 //!
@@ -27,7 +28,7 @@
 //!
 //! Markdown under `corpus/responses/` remains the source of truth. Jira is a
 //! publication surface: convert for paste-in, import only as drafts under
-//! `corpus/imports/`.
+//! `corpus/imports/`, then [`scaffold::promote_to_corpus`] after review.
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/mark.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/favicon.svg")]
@@ -39,6 +40,7 @@ pub mod doctor;
 pub mod index;
 pub mod jira_import;
 pub mod lint;
+pub mod scaffold;
 
 pub use check::{check_corpus, check_responses, format_check_report, CheckReport, REQUIRED_PREFIX};
 pub use convert::{
@@ -59,4 +61,8 @@ pub use jira_import::{
 };
 pub use lint::{
     format_report, lint_paths, lint_text_harper_inprocess, LintEngine, LintFinding, LintReport,
+};
+pub use scaffold::{
+    check_response_path, promote_to_corpus, resolve_response_id, scaffold_markdown, write_scaffold,
+    ScaffoldOptions, TEAM_SIGN_OFF,
 };

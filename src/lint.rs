@@ -181,7 +181,75 @@ pub fn lint_paths(paths: &[PathBuf], engine: LintEngine) -> Result<LintReport> {
     Ok(report)
 }
 
+/// Domain tokens always allowed for spelling (HPC / Demo corpus jargon).
+/// Also merged with `styles/Vocab/canonic/accept.txt` when present (Vale vocab).
+fn domain_vocab_tokens() -> Vec<String> {
+    let mut tokens: Vec<String> = [
+        "demo",
+        "resp",
+        "jira",
+        "pandoc",
+        "jaccard",
+        "tantivy",
+        "bm25",
+        "dedupe",
+        "surf",
+        "hpc",
+        "advisors",
+        "canonic",
+        "confluence",
+        "atlassian",
+        "adf",
+        "wiki",
+        "sop",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect();
+    for candidate in [
+        "styles/Vocab/canonic/accept.txt",
+        "styles/vocab/canonic/accept.txt",
+    ] {
+        if let Ok(text) = std::fs::read_to_string(candidate) {
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                // Vale patterns like [Ss]nellius → extract letters only for a token.
+                let token: String = line
+                    .chars()
+                    .filter(|c| c.is_ascii_alphabetic())
+                    .collect::<String>()
+                    .to_lowercase();
+                if token.len() >= 2 && !tokens.contains(&token) {
+                    tokens.push(token);
+                }
+            }
+            break;
+        }
+    }
+    tokens
+}
+
+fn is_domain_vocab_spelling(snippet: &str, kind: &str) -> bool {
+    if !kind.eq_ignore_ascii_case("Spelling") && !kind.to_lowercase().contains("spell") {
+        return false;
+    }
+    let token = snippet
+        .trim()
+        .trim_matches(|c: char| !c.is_ascii_alphanumeric())
+        .to_lowercase();
+    if token.is_empty() {
+        return false;
+    }
+    domain_vocab_tokens().iter().any(|v| v == &token)
+}
+
 /// Lint a single text buffer with in-process harper-core (unit-testable pure path).
+///
+/// Spelling hits on domain vocabulary (Demo, HPC, …) are suppressed so CI can
+/// gate published responses without false positives on tooling jargon.
 pub fn lint_text_harper_inprocess(text: &str) -> Vec<LintFinding> {
     use harper_core::linting::{LintGroup, Linter};
     use harper_core::spell::FstDictionary;
@@ -197,6 +265,9 @@ pub fn lint_text_harper_inprocess(text: &str) -> Vec<LintFinding> {
         for lint in grammar.lint(&doc) {
             let snippet = doc.get_span_content_str(&lint.span);
             let kind = format!("{:?}", lint.lint_kind);
+            if is_domain_vocab_spelling(&snippet, &kind) {
+                continue;
+            }
             findings.push(LintFinding {
                 engine: "harper-core".into(),
                 path: String::new(),
@@ -438,6 +509,19 @@ mod tests {
             "expected at least one grammar finding for 'This is an test.': {findings:?}"
         );
         assert!(findings.iter().all(|f| f.engine == "harper-core"));
+    }
+
+    #[test]
+    fn harper_suppresses_domain_vocab_spelling() {
+        let text = "Project space on the cluster is for active project data.\n\nRegards, Support Team\n";
+        let findings = lint_text_harper_inprocess(text);
+        assert!(
+            findings.iter().all(|f| {
+                let m = f.message.to_lowercase();
+                !m.contains("'demo'") && !m.contains("'hpc'")
+            }),
+            "domain spelling should be suppressed: {findings:?}"
+        );
     }
 
     #[test]
