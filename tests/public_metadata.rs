@@ -181,7 +181,7 @@ fn package_msrv_covers_locked_direct_deps() {
 
     // README and docs must advertise the same floor (X.Y+).
     let readme = read("README.md");
-    let docs = read("docs/source/index.rst");
+    let docs = read("docs/orgmode/index.org");
     let claim = format!("{package_msrv}+");
     // Allow "1.85+" even if rust-version is "1.85.0"
     let short = package_msrv
@@ -196,7 +196,7 @@ fn package_msrv_covers_locked_direct_deps() {
     );
     assert!(
         docs.contains(&claim) || docs.contains(&short_claim),
-        "docs/source/index.rst must document Rust {short_claim}"
+        "docs/orgmode/index.org must document Rust {short_claim}"
     );
     // Guard against stale 1.75 claims
     assert!(
@@ -288,11 +288,15 @@ fn gitignore_covers_agent_and_docs_artifacts() {
     assert!(gi.contains("docs/build/") || gi.contains("docs/build"));
     assert!(gi.contains(".venv-docs") || gi.contains("venv"));
     assert!(gi.contains("/target") || gi.contains("target"));
+    assert!(
+        gi.contains("docs/source/*.rst") || gi.contains("docs/source/**/*.rst"),
+        ".gitignore must ignore ox-rst generated RST under docs/source/"
+    );
 }
 
 #[test]
 fn usage_docs_cover_tui_and_command_loop() {
-    let usage = read("docs/source/usage.rst");
+    let usage = read("docs/orgmode/usage.org");
     assert!(usage.contains("canonic tui") || usage.contains("``tui``"));
     assert!(usage.contains("Interactive TUI") || usage.contains("tui-section"));
     assert!(usage.contains("promote"));

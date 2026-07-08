@@ -17,8 +17,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pandoc (doctor / convert path in rustdoc examples)
-        run: sudo apt-get update && sudo apt-get install -y pandoc
+      - name: Install pandoc + emacs (org → RST export, doctor examples)
+        run: sudo apt-get update && sudo apt-get install -y pandoc emacs-nox
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

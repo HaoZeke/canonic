@@ -1,3 +1,8 @@
+#+TITLE: Architecture
+#+AUTHOR: [[https://rgoswami.me][Rohit Goswami]]
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil ^:nil
+
+#+begin_export rst
 Architecture
 ============
 
@@ -52,14 +57,23 @@ Free Jira platform map
 canonic uses only **native** Jira REST (Cloud Free API tokens or Server/DC
 PAT) — no Marketplace apps:
 
-+------------------+-----------------------------------------------+---------------------------+
-| Command          | Endpoint                                      | Body / notes              |
-+==================+===============================================+===========================+
-| ``jira-probe``   | ``GET /rest/api/2/myself`` (+ serverInfo)     | reports Cloud vs Server   |
-+------------------+-----------------------------------------------+---------------------------+
-| ``import-jira``  | ``GET …/search`` (v2, then v3/jql fallback)   | comments wiki **or** ADF  |
-|                  | ``GET …/issue/{key}/comment``                  |                           |
-+------------------+-----------------------------------------------+---------------------------+
-| ``jira-comment`` | Server: ``POST /rest/api/2/…/comment``        | wiki string               |
-|                  | Cloud: ``POST /rest/api/3/…/comment``         | minimal free ADF          |
-+------------------+-----------------------------------------------+---------------------------+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 48 34
+
+   * - Command
+     - Endpoint
+     - Body / notes
+   * - ``jira-probe``
+     - ``GET /rest/api/2/myself`` (+ serverInfo)
+     - reports Cloud vs Server
+   * - ``import-jira``
+     - ``GET …/search`` (v2, then v3/jql fallback);
+       ``GET …/issue/{key}/comment``
+     - comments wiki **or** ADF
+   * - ``jira-comment``
+     - Server: ``POST /rest/api/2/…/comment``;
+       Cloud: ``POST /rest/api/3/…/comment``
+     - wiki string / minimal free ADF
+
+#+end_export

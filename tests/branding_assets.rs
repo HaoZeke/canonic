@@ -92,11 +92,22 @@ fn docs_requirements_and_build_entry_exist() {
     let script = fs::read_to_string(&build).unwrap();
     assert!(script.contains("sphinx-build"));
     assert!(script.contains("shibuya") || script.contains("Shibuya"));
+    assert!(
+        script.contains("export.el") || script.contains("ox-rst") || script.contains("orgmode"),
+        "docs build must export orgmode → RST"
+    );
+    let export = repo_root().join("docs/export.el");
+    assert!(export.is_file(), "docs/export.el missing");
+    let export_el = fs::read_to_string(&export).unwrap();
+    assert!(
+        export_el.contains("ox-rst") && export_el.contains("org-rst-publish-to-rst"),
+        "export.el must publish org → RST via ox-rst"
+    );
 }
 
 #[test]
 fn landing_page_has_product_ux_structure() {
-    let index = fs::read_to_string(repo_root().join("docs/source/index.rst")).unwrap();
+    let index = fs::read_to_string(repo_root().join("docs/orgmode/index.org")).unwrap();
     assert!(index.contains("cn-hero"), "landing hero class");
     assert!(index.contains("cn-hero-cta") || index.contains("cn-btn"), "hero CTAs");
     assert!(index.contains("cn-flow"), "workflow flow strip");
@@ -105,16 +116,16 @@ fn landing_page_has_product_ux_structure() {
     let css = fs::read_to_string(static_dir().join("custom.css")).unwrap();
     assert!(css.len() > 1500, "custom.css should be a real brand layer");
     assert!(css.contains(".cn-hero") && css.contains(".cn-flow") && css.contains(".cn-btn"));
-    let usage = fs::read_to_string(repo_root().join("docs/source/usage.rst")).unwrap();
+    let usage = fs::read_to_string(repo_root().join("docs/orgmode/usage.org")).unwrap();
     assert!(usage.contains("cn-page-intro") && usage.contains("cn-cmd-list"));
 }
 
 #[test]
 fn architecture_and_api_pages_ship_visuals_and_rustdoc_link() {
-    let arch = fs::read_to_string(repo_root().join("docs/source/architecture.rst")).unwrap();
+    let arch = fs::read_to_string(repo_root().join("docs/orgmode/architecture.org")).unwrap();
     assert!(arch.contains("architecture.svg"), "architecture page needs diagram");
     assert!(arch.contains("modules.svg"), "architecture page needs module map");
-    let api = fs::read_to_string(repo_root().join("docs/source/api.rst")).unwrap();
+    let api = fs::read_to_string(repo_root().join("docs/orgmode/api.org")).unwrap();
     assert!(api.contains("rustdoc/canonic/index.html"), "API page must link shipped rustdoc");
     assert!(api.contains("cn-mod-grid") || api.contains("Module overview"));
     let arch_svg = static_dir().join("architecture.svg");

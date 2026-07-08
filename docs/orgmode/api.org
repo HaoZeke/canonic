@@ -1,3 +1,8 @@
+#+TITLE: Rust API
+#+AUTHOR: [[https://rgoswami.me][Rohit Goswami]]
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil ^:nil
+
+#+begin_export rst
 Rust API
 ========
 
@@ -50,3 +55,5 @@ Build rustdoc alone
    cargo doc --no-deps --open
    # or via the site build (copies into docs/build/rustdoc/):
    ./docs/build.sh
+
+#+end_export

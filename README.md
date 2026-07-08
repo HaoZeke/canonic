@@ -22,7 +22,7 @@ Sphinx + [Shibuya](https://shibuya.lepture.com/) themed HTML lives under `docs/`
 python3 -m http.server -d docs/build 8000
 ```
 
-The script creates `.venv-docs` if needed, installs `docs/requirements.txt` (Sphinx, Shibuya, sphinx-design, sphinx-copybutton), runs `sphinx-build`, then `cargo doc` and copies rustdoc into `docs/build/rustdoc/` (open `docs/build/rustdoc/canonic/index.html` or use the **Rust API** nav link). Branding assets live in `docs/source/_static/` (logos, favicon, mark, architecture/module diagrams). Set `CANONIC_SKIP_RUSTDOC=1` to skip the rustdoc step.
+Prose is authored in **org-mode** under `docs/orgmode/` (same pattern as nimvault/meetrec). `./docs/build.sh` runs Emacs `ox-rst` (`docs/export.el`) to generate untracked `docs/source/*.rst`, installs `docs/requirements.txt` into `.venv-docs` (Sphinx, Shibuya, sphinx-design, sphinx-copybutton), runs `sphinx-build`, then `cargo doc` and copies rustdoc into `docs/build/rustdoc/` (open `docs/build/rustdoc/canonic/index.html` or use the **Rust API** nav link). Branding assets live in `docs/source/_static/` (logos, favicon, mark, architecture/module diagrams). Set `CANONIC_SKIP_RUSTDOC=1` to skip rustdoc; set `CANONIC_SKIP_ORG_EXPORT=1` only if RST is already exported.
 
 ## Install
 
@@ -165,7 +165,7 @@ canonic promote corpus/imports/resp-some-topic-hsp-101.md
 | `reindex` / `search` / `dedupe` | Local Tantivy BM25 + near-duplicates |
 | `jira-probe` / `import-jira` / `jira-comment` | Free platform REST only (no Marketplace apps) |
 
-Full recipes, keybindings, exit codes, and the free REST map: **[docs/source/usage.rst](docs/source/usage.rst)** (HTML via `./docs/build.sh` → Usage).
+Full recipes, keybindings, exit codes, and the free REST map: **[docs/orgmode/usage.org](docs/orgmode/usage.org)** (HTML via `./docs/build.sh` → Usage).
 
 ### Interactive TUI
 

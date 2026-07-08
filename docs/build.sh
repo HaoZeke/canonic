@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Build the canonic Sphinx/Shibuya site + rustdoc API.
+# Prose source: docs/orgmode/*.org → ox-rst → docs/source/*.rst (untracked).
 # Usage (from repo root or this directory):
 #   ./docs/build.sh
-# Optional: CANONIC_DOC_VENV=path  CANONIC_SKIP_RUSTDOC=1
+# Optional: CANONIC_DOC_VENV=path  CANONIC_SKIP_RUSTDOC=1  CANONIC_SKIP_ORG_EXPORT=1
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -11,6 +12,22 @@ VENV="${CANONIC_DOC_VENV:-$ROOT/.venv-docs}"
 REQ="$ROOT/docs/requirements.txt"
 SRC="$ROOT/docs/source"
 BUILD="$ROOT/docs/build"
+DOCS="$ROOT/docs"
+
+if [[ "${CANONIC_SKIP_ORG_EXPORT:-0}" != "1" ]]; then
+  echo "==> 0/3 orgmode → RST (emacs ox-rst)"
+  if ! command -v emacs >/dev/null 2>&1; then
+    echo "error: emacs required to export docs/orgmode → docs/source/*.rst" >&2
+    echo "       install emacs, or set CANONIC_SKIP_ORG_EXPORT=1 if RST already present" >&2
+    exit 1
+  fi
+  (
+    cd "$DOCS"
+    emacs --batch --load export.el
+  )
+else
+  echo "==> 0/3 skip org export (CANONIC_SKIP_ORG_EXPORT=1)"
+fi
 
 echo "==> 1/3 ensure Python doc deps in $VENV"
 if [[ ! -d "$VENV" ]]; then

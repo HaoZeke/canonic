@@ -114,7 +114,7 @@ is installed. Keep published responses check-clean so CI stays green.
 | `j`/`k` | Move · `/` filter · `C` check · `c` convert preview |
 | `l` lint · `r` reindex · `s` search · `q` quit |
 
-Full usage: `docs/source/usage.rst` and README **Usage** section.
+Full usage: `docs/orgmode/usage.org` and README **Usage** section.
 
 ## Agent checklist
 

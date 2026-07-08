@@ -1,3 +1,8 @@
+#+TITLE: Usage
+#+AUTHOR: [[https://rgoswami.me][Rohit Goswami]]
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil ^:nil
+
+#+begin_export rst
 Usage
 =====
 
@@ -469,3 +474,5 @@ Heavy official Atlassian Jira Software (developer timebomb; multi-GB RAM):
 .. code:: shell
 
    ./scripts/jira-real/run-import-smoke.sh
+
+#+end_export

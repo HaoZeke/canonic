@@ -1,3 +1,8 @@
+#+TITLE: Design notes
+#+AUTHOR: [[https://rgoswami.me][Rohit Goswami]]
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil ^:nil
+
+#+begin_export rst
 Design notes
 ============
 
@@ -57,3 +62,5 @@ Building this site
 
    ./docs/build.sh
    # open docs/build/index.html
+
+#+end_export

@@ -1,3 +1,8 @@
+#+TITLE: ~canonic~
+#+AUTHOR: [[https://rgoswami.me][Rohit Goswami]]
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil ^:nil
+
+#+begin_export rst
 .. raw:: html
 
    <div class="cn-hero">
@@ -192,3 +197,5 @@ Source & license
 - Repository: https://github.com/HaoZeke/canonic
 - License: MIT — see ``LICENSE``
 - Site theme: `Shibuya <https://shibuya.lepture.com/>`_ (build with ``./docs/build.sh``)
+
+#+end_export
