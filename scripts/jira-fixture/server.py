@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urlparse
 HOST = "0.0.0.0"
 PORT = 8080
 
-# Basic auth expected by the fixture (Server-style username/password).
+# Disposable fixture-only credentials (local container smoke — not production secrets).
 USER = "advisor"
 PASSWORD = "canonic-test"
 # Also accept a Bearer PAT so both canonic auth modes can be exercised.

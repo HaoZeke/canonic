@@ -27,6 +27,7 @@ LICENSE = (
     "5bjYilfNdokZr6zmP7TmY5YwLAIUNq8MbmR8GfaV9ulfLz1K+3g9j1YCFDeq7aYROMQbwMIv"
     "HimNt7/bJCCIX02nj"
 )
+# Disposable fixture-only admin for the local Jira Software smoke (not production).
 ADMIN_USER = "admin"
 ADMIN_PASS = "CanonicAdmin!2026"
 ADMIN_EMAIL = "admin@example.com"

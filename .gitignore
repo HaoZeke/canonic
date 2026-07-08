@@ -1,10 +1,25 @@
 /target
 **/*.rs.bk
 .canonic-index/
+corpus/imports/
 *.mdb
 .DS_Store
+
+# Agent / editor local config (never publish)
 .claude/
 .codex/
+.grok/
+.cursor/
+.idea/
+.vscode/
+
 # Sphinx / Shibuya docs build
 docs/build/
 .venv-docs/
+.venv/
+__pycache__/
+*.pyc
+
+# Local smoke workdirs
+/tmp/
+canonic-jira-*
