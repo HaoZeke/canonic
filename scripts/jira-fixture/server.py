@@ -8,7 +8,7 @@ Platform REST only (no Marketplace apps). Implements:
   GET  /rest/api/2/issue/{key}/comment
   POST /rest/api/2/issue/{key}/comment   {"body": "<wiki>"}
 
-Seed data mirrors demo-shaped messy personal canned answers.
+Seed data is fictional messy personal canned answers for local smoke tests.
 """
 
 from __future__ import annotations
@@ -35,14 +35,14 @@ PAT = "pat-canonic-fixture-token"
 ISSUES = [
     {
         "key": "HSP-101",
-        "summary": "Project space is not a backup",
+        "summary": "Demo: project space is not a backup",
         "labels": ["canned-response", "storage"],
         "comments": [
             {
                 "author": "Alice Advisor",
                 "created": "2025-11-02T10:15:00.000+0000",
                 "body": (
-                    "h1. Project space is not a backup\n\n"
+                    "h1. Demo: project space is not a backup\n\n"
                     "Demo *project space* is for active working data, not "
                     "long-term archival. Use the self-service backup options "
                     "described in the storage SOP.\n\n"
@@ -61,7 +61,7 @@ ISSUES = [
     },
     {
         "key": "HSP-102",
-        "summary": "How to request a software install on the cluster",
+        "summary": "How to request a software install (demo)",
         "labels": ["canned-response", "software"],
         "comments": [
             {
@@ -73,7 +73,7 @@ ISSUES = [
                     "* package name and version\n"
                     "* why the central module stack is insufficient\n"
                     "* license constraints if any\n\n"
-                    "We prefer EasyBuild easyconfigs when available.\n\n"
+                    "We prefer existing module recipes when available.\n\n"
                     "Regards,\nSupport Team\n"
                 ),
             }
@@ -100,7 +100,7 @@ ISSUES = [
                 "author": "Eve Legacy",
                 "created": "2024-06-01T11:00:00.000+0000",
                 "body": (
-                    "h1. Project space is not a backup\n\n"
+                    "h1. Demo: project space is not a backup\n\n"
                     "Old wording: project dirs are *not* backed up. "
                     "Users should copy important data themselves.\n\n"
                     "Cheers,\nEve\n"  # personal + stale

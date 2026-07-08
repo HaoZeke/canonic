@@ -44,7 +44,7 @@ jobs:
           # In-process harper-core only (Vale may be absent on the runner).
           ./target/release/canonic lint --engine harper
           # Convert/render smoke: non-empty jira body from the seeded sample.
-          sample=corpus/responses/resp-project-space-is-not-a-backup.md
+          sample=corpus/responses/resp-demo-shared-quota.md
           test -f "$sample"
           out=$(./target/release/canonic convert "$sample")
           test -n "$out"

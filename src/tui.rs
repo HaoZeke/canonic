@@ -521,7 +521,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(ACCENT))
-            .title(" Jira canned responses "),
+            .title(" canned-response corpus "),
     );
     frame.render_widget(header, root[0]);
 

@@ -367,8 +367,8 @@ mod tests {
 
     #[test]
     fn jaccard_high_for_near_duplicates() {
-        let a = "project space is not a backup or archive on demo";
-        let b = "project space is not a backup archive for demo users";
+        let a = "project space is not a backup or archive on the cluster";
+        let b = "project space is not a backup archive for cluster users";
         let c = "small compute request needs an sbu calculation for gpu nodes";
         assert!(jaccard_similarity(a, b) > jaccard_similarity(a, c));
         assert!(jaccard_similarity(a, b) > 0.3);
@@ -404,7 +404,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let corpus = dir.path().join("responses");
         fs::create_dir_all(&corpus).unwrap();
-        let body = "Project space on the cluster is user-managed working storage and not a backup system for research data that must be archived to tape.";
+        let body = "Project space on the cluster is user-managed working storage and not a backup system for research data that must be archived offline.";
         fs::write(
             corpus.join("resp-a.md"),
             format!("---\nid: resp-a\ntitle: Project space note A\nprefix: resp\nsop: none\n---\n\n{body}\n"),

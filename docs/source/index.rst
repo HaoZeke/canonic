@@ -1,7 +1,7 @@
 .. raw:: html
 
    <div class="cn-hero">
-     <p class="cn-hero-eyebrow">markdown corpus · shared advisor library</p>
+     <p class="cn-hero-eyebrow">markdown corpus · Jira convert · quality gates</p>
      <div class="cn-hero-brand">
        <img class="cn-hero-mark" src="_static/mark.svg" width="60" height="60" alt="" />
        <div>
@@ -11,7 +11,7 @@
      </div>
      <img class="cn-hero-logo cn-hero-logo-light" src="_static/logo.svg" width="320" height="60" alt="canonic" />
      <img class="cn-hero-logo cn-hero-logo-dark" src="_static/logo-dark.svg" width="320" height="60" alt="canonic" />
-     <p class="cn-hero-tagline">Canned-response corpus for Jira Jira work — markdown under a shared <code>resp-</code> prefix is the source of truth. Convert with pandoc, gate with quality checks, search and dedupe with Tantivy.</p>
+     <p class="cn-hero-tagline">Versioned canned-response corpus for Jira workflows — markdown under a shared <code>resp-</code> prefix is the source of truth. Convert with pandoc, gate with quality checks, search and dedupe with Tantivy.</p>
      <div class="cn-hero-pills">
        <span>markdown corpus</span>
        <span>resp- prefix</span>
@@ -29,7 +29,7 @@
 Why canonic
 ===========
 
-Shared advisor answers should live in git, not only in Jira comments.
+Shared support answers should live in git, not only in Jira comments.
 **canonic** treats version-controlled markdown under ``corpus/responses/`` as the
 source of truth: check quality before migration, convert with pandoc's Jira
 writer, lint with Vale or in-process Harper, and search or dedupe with a local
@@ -135,12 +135,12 @@ First canned response
 .. raw:: html
 
    <ol class="cn-steps">
-     <li><strong>Create</strong> <code>corpus/responses/resp-example-topic.md</code> with front matter
+     <li><strong>Create</strong> <code>corpus/responses/resp-demo-shared-quota.md</code> with front matter
      (<code>id</code>, <code>title</code>, <code>prefix: resp</code>, <code>tags</code>, <code>sop</code>) and a
      team-generic closing (e.g. <code>Support Team</code>).</li>
      <li><strong>Validate:</strong> <code>canonic check</code></li>
      <li><strong>Index &amp; search:</strong> <code>canonic reindex</code> then <code>canonic search "example topic"</code></li>
-     <li><strong>Convert</strong> (needs pandoc): <code>canonic convert corpus/responses/resp-example-topic.md</code></li>
+     <li><strong>Convert</strong> (needs pandoc): <code>canonic convert corpus/responses/resp-demo-shared-quota.md</code></li>
    </ol>
 
 Delete the example once you commit a real response under its own id.

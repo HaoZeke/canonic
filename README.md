@@ -4,7 +4,7 @@
   <img src="docs/source/_static/logo.svg" width="280" alt="canonic logo" />
 </p>
 
-**Canonical** canned-response corpus for the generic Jira Jira work: version-controlled **markdown** under a shared **`resp-`** prefix is the source of truth. Convert with **pandoc**, enforce **quality checks** before migration, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
+**canonic** is a versioned **Jira canned-response** corpus tool: markdown under a shared **`resp-`** id prefix is the source of truth. Convert with **pandoc**, enforce **quality checks**, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25). The `resp-` prefix is a configurable naming convention, not a product brand.
 
 ## Docs site (Shibuya)
 
@@ -51,7 +51,7 @@ Published answers live under `corpus/responses/` (a seeded sample ships so `list
 
    ```bash
    canonic new "Example topic" --tags example
-   # → corpus/responses/resp-example-topic.md
+   # → corpus/responses/resp-demo-shared-quota.md
    ```
 
 2. Edit the body, then validate:
@@ -71,8 +71,8 @@ Published answers live under `corpus/responses/` (a seeded sample ships so `list
 4. Convert to Jira wiki markup (requires pandoc), or post explicitly:
 
    ```bash
-   canonic convert corpus/responses/resp-example-topic.md
-   canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
+   canonic convert corpus/responses/resp-demo-shared-quota.md
+   canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md --dry-run
    ```
 
 **Import → review → promote:** pull existing Jira comments as drafts (never auto-published), edit, then promote:
@@ -86,9 +86,9 @@ canonic check
 
 Agent day-to-day loop: install the in-repo skill at `.agents/skills/canonic-canned-loop/` (see that `SKILL.md`).
 
-### Team review (GitLab)
+### Team review (optional GitLab mirror)
 
-Published wording should land via merge request. If your team reviews on GitLab while the public clone remote is GitHub:
+Published wording should land via merge request. If you review on GitLab while the primary remote is elsewhere:
 
 ```bash
 export CANONIC_GITLAB_REMOTE=git@gitlab.example.com:your-group/canonic.git
@@ -118,7 +118,7 @@ sop: none
 ```
 
 - `id` and filename stem must match and start with `resp-`
-- `prefix: resp` required (shared advisor library; no personal prefixes)
+- `prefix: resp` required (shared library convention; no personal prefixes)
 - `sop:` required — Confluence/service-desk wiki URL, or literal `none` when no SOP page exists yet
 - Closings must be team-generic (e.g. `Support Team`), not personal names
 
@@ -133,7 +133,7 @@ canonic tui                            # interactive ratatui browser
 canonic new "Project space is not a backup" --tags storage
 canonic check                          # quality gate (exit 1 on findings)
 canonic lint --engine harper           # in-process harper-core (CI uses this)
-canonic convert corpus/responses/resp-project-space-is-not-a-backup.md
+canonic convert corpus/responses/resp-demo-shared-quota.md
 
 canonic reindex
 canonic search "project space backup"
@@ -203,8 +203,8 @@ canonic import-jira "project = HSP AND labels = canned-response" --dry-run
 canonic import-jira "project = HSP AND labels = canned-response"
 
 # Explicit write: pandoc jira → free REST comment (Cloud ADF / Server wiki)
-canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
-canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md
+canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md --dry-run
+canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md
 canonic jira-comment --issue HSP-101 PATH.md --body-format wiki   # force Server/DC
 canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud ADF
 ```

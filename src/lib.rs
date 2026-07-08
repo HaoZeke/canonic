@@ -1,6 +1,6 @@
 //! # canonic
 //!
-//! Versioned markdown canned-response corpus for the cluster / Support Jira work.
+//! Versioned markdown canned-response corpus for Jira support workflows.
 //!
 //! The CLI is a thin front end. Library consumers can call the same engines:
 //!

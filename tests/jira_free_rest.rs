@@ -153,11 +153,17 @@ fn free_rest_probe_import_and_comment_via_fixture() {
         .filter(|e| e.path().extension().map(|x| x == "md").unwrap_or(false))
         .collect();
     assert_eq!(drafts.len(), 3, "expected 3 drafts");
-    let sample = std::fs::read_to_string(
-        out_dir
-            .join("resp-project-space-is-not-a-backup-hsp-101.md"),
-    )
-    .expect("draft");
+    let draft_101 = drafts
+        .iter()
+        .map(|e| e.path())
+        .find(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.contains("hsp-101"))
+                .unwrap_or(false)
+        })
+        .expect("draft for HSP-101");
+    let sample = std::fs::read_to_string(&draft_101).expect("draft");
     assert!(sample.contains("prefix: resp"));
     assert!(sample.contains("imported from HSP-101"));
 

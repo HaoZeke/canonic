@@ -21,7 +21,7 @@ use std::process::ExitCode;
 #[command(
     name = "canonic",
     version,
-    about = "Versioned Jira canned responses: convert, quality check, Tantivy search/dedupe"
+    about = "Versioned Jira canned-response corpus: convert, quality check, Tantivy search/dedupe"
 )]
 struct Cli {
     #[command(subcommand)]

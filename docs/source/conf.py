@@ -63,7 +63,7 @@ html_sidebars = {
 
 html_meta = {
     "description": (
-        "canonic — versioned Jira canned-response corpus for Jira: "
+        "canonic — versioned Jira canned-response corpus: "
         "markdown under resp-, pandoc convert, quality checks, Tantivy search."
     ),
 }

@@ -119,8 +119,7 @@ for f in "${MDS[@]}"; do
 done
 
 # personal sign-off still present in draft (review-before-migrate: human must fix)
-grep -q 'Alice Advisor' "$OUT"/resp-project-space-is-not-a-backup-hsp-101.md \
-  || grep -qi 'alice' "$OUT"/resp-*-hsp-101.md
+grep -qi 'alice' "$OUT"/resp-*-hsp-101.md
 
 echo "==> Bearer PAT auth path"
 rm -f "$OUT"/*.md

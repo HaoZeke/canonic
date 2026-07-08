@@ -91,7 +91,7 @@ fn promote_moves_check_clean_draft_into_responses_style_dir() {
     // Edit draft body slightly (still check-clean).
     let mut text = fs::read_to_string(&draft).unwrap();
     text = text.replace(
-        "Replace this paragraph with the shared advisor answer. Keep the team sign-off below.",
+        "Replace this paragraph with the shared team answer. Keep the team sign-off below.",
         "Load compiler modules before MPI modules when building software.",
     );
     fs::write(&draft, text).unwrap();
@@ -124,7 +124,7 @@ fn published_sample_corpus_is_non_empty_and_check_clean() {
     let corpus = repo_root().join("corpus/responses");
     let list = run_ok(&["list", "--corpus", corpus.to_str().unwrap()], &[]);
     assert!(
-        list.contains("resp-project-space-is-not-a-backup"),
+        list.contains("resp-demo-shared-quota"),
         "seeded sample missing from list: {list}"
     );
     let check = run_ok(&["check", "--corpus", corpus.to_str().unwrap()], &[]);
@@ -136,7 +136,7 @@ fn published_sample_corpus_is_non_empty_and_check_clean() {
 
 #[test]
 fn convert_or_dry_run_renders_sample_when_pandoc_present() {
-    let sample = repo_root().join("corpus/responses/resp-project-space-is-not-a-backup.md");
+    let sample = repo_root().join("corpus/responses/resp-demo-shared-quota.md");
     assert!(sample.is_file());
     let doctor = Command::new(bin())
         .current_dir(repo_root())

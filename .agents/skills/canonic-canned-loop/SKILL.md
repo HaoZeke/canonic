@@ -1,10 +1,10 @@
 ---
 name: canonic-canned-loop
 description: >-
-  Day-to-day Jira canned-response loop with canonic: probe free Jira,
+  Day-to-day canned-response loop with canonic: probe free Jira,
   import drafts, scaffold or promote into corpus/responses, edit, check/lint,
   reindex/search/dedupe, convert or explicit jira-comment, and rely on CI.
-  Use when curating shared resp- markdown, importing Jira comments as review
+  Use when curating shared resp- prefix markdown, importing Jira comments as review
   drafts, or publishing one-shot free-tier comments. No bulk auto-sync and no
   Marketplace apps.
 ---

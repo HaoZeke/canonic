@@ -213,7 +213,7 @@ Recipes
 .. code:: shell
 
    canonic new "Project space is not a backup" --tags storage,project-space
-   $EDITOR corpus/responses/resp-project-space-is-not-a-backup.md
+   $EDITOR corpus/responses/resp-demo-shared-quota.md
    canonic check
    canonic lint --engine harper
    canonic tui
@@ -244,11 +244,11 @@ Recipes
 
 .. code:: shell
 
-   canonic convert corpus/responses/resp-project-space-is-not-a-backup.md
+   canonic convert corpus/responses/resp-demo-shared-quota.md
    canonic jira-comment --issue HSP-101 \
-     corpus/responses/resp-project-space-is-not-a-backup.md --dry-run
+     corpus/responses/resp-demo-shared-quota.md --dry-run
    canonic jira-comment --issue HSP-101 \
-     corpus/responses/resp-project-space-is-not-a-backup.md
+     corpus/responses/resp-demo-shared-quota.md
 
 Full paste-ready session
 ------------------------
@@ -260,7 +260,7 @@ Full paste-ready session
    canonic new "Example topic" --tags example
    canonic check
    canonic lint --engine harper
-   canonic convert corpus/responses/resp-project-space-is-not-a-backup.md
+   canonic convert corpus/responses/resp-demo-shared-quota.md
    canonic tui
 
    canonic reindex
@@ -273,7 +273,7 @@ Full paste-ready session
    canonic import-jira "project = HSP AND labels = canned-response" --dry-run
    canonic promote corpus/imports/resp-example-hsp-101.md
    canonic jira-comment --issue HSP-101 \
-     corpus/responses/resp-project-space-is-not-a-backup.md --dry-run
+     corpus/responses/resp-demo-shared-quota.md --dry-run
 
 Corpus layout
 -------------
@@ -295,7 +295,7 @@ Front matter is enforced by ``canonic check``:
 .. important::
 
    - ``id`` and filename stem must match and start with ``resp-``
-   - ``prefix: resp`` required (shared advisor library; no personal prefixes)
+   - ``prefix: resp`` required (shared library convention; no personal prefixes)
    - ``sop:`` required — Confluence / service-desk wiki URL, or the literal
      ``none`` when no SOP page exists yet
    - Closings must be team-generic (e.g. ``Support Team``), not personal names
@@ -324,7 +324,7 @@ GitHub Actions runs ``cargo test --locked --all-targets``, then on the release
 binary:
 
 1. ``canonic list`` / ``canonic check`` on ``corpus/responses/``
-2. ``canonic lint --engine harper`` (in-process; domain vocab for the cluster/HPC)
+2. ``canonic lint --engine harper`` (in-process; domain vocab for tooling jargon)
 3. ``canonic convert`` smoke on the seeded sample (pandoc installed in CI)
 
 Keep published responses check-clean so the gate stays green.
@@ -347,7 +347,7 @@ Free Jira REST (no paid Marketplace apps)
 -----------------------------------------
 
 canonic uses only **native platform REST** (Cloud Free API tokens or Server/DC
-PAT). No Marketplace extensions, ScriptRunner, or paid Service Desk canned-response
+PAT). No Marketplace extensions, ScriptRunner, or paid service-desk canned-response
 admin APIs.
 
 **Probe**

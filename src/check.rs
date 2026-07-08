@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::path::Path;
 use std::sync::OnceLock;
 
-/// Shared Jira/prefix convention from team meeting.
+/// Shared id/prefix convention for the published response library.
 pub const REQUIRED_PREFIX: &str = "resp";
 
 /// One quality finding.
@@ -178,8 +178,8 @@ fn personal_signature_hit(content: &str) -> Option<&'static str> {
         if w[0].eq_ignore_ascii_case("regards,") || w[0].eq_ignore_ascii_case("regards") {
             let next = w[1];
             if !next.is_empty()
-                && !next.to_lowercase().contains("surf")
-                && !next.to_lowercase().contains("advisor")
+                && !next.to_lowercase().contains("support")
+                && !next.to_lowercase().contains("team")
                 && next.split_whitespace().count() <= 2
                 && next
                     .chars()

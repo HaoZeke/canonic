@@ -42,10 +42,10 @@ print("issuetypes", [(t.get("id"), t.get("name")) for t in (types if isinstance(
 
 issues = [
     ("Project space is not a backup", ["canned-response", "storage"], [
-        "h1. Project space is not a backup\n\nDemo *project space* is for active working data, not long-term archival. Use the self-service backup options described in the storage SOP.\n\nRegards,\nAlice Advisor\n",
+        "h1. Project space is not a backup\n\nDemo cluster *project space* is for active working data, not long-term archival. Use the self-service backup options described in the storage SOP.\n\nRegards,\nAlice Advisor\n",
         "Also remind users that {{/home}} and scratch are separate quotas. See the *storage* FAQ.\n",
     ]),
-    ("How to request a software install on the cluster", ["canned-response", "software"], [
+    ("How to request a software install on Demo cluster", ["canned-response", "software"], [
         "h2. Software install requests\n\nPlease open a ticket with:\n* package name and version\n* why the central module stack is insufficient\n* license constraints if any\n\nWe prefer EasyBuild easyconfigs when available.\n\nRegards,\nSupport Team\n"
     ]),
     ("Unrelated networking question", ["networking"], ["Please use eduVPN for off-site access.\n"]),

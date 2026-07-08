@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Push the current branch to a GitLab mirror remote for team MR review.
+# Push the current branch to an optional GitLab mirror remote for team MR review.
 # Usage: CANONIC_GITLAB_REMOTE=git@gitlab.example:group/canonic.git scripts/mirror-to-gitlab.sh [branch]
 set -euo pipefail
 

@@ -90,7 +90,7 @@ pub fn scaffold_markdown(opts: &ScaffoldOptions) -> Result<String> {
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .unwrap_or(
-            "Replace this paragraph with the shared advisor answer. Keep the team sign-off below.",
+            "Replace this paragraph with the shared team answer. Keep the team sign-off below.",
         );
     let title = opts.title.trim();
     Ok(format!(
@@ -191,7 +191,7 @@ mod tests {
             sop: "none".into(),
             tags: vec!["storage".into()],
             body: Some(
-                "Project space on the cluster is for active project data, not long-term backup."
+                "Shared project storage is for active working data, not long-term backup."
                     .into(),
             ),
         };

@@ -181,27 +181,24 @@ pub fn lint_paths(paths: &[PathBuf], engine: LintEngine) -> Result<LintReport> {
     Ok(report)
 }
 
-/// Domain tokens always allowed for spelling (HPC / Demo corpus jargon).
+/// Domain tokens always allowed for spelling (tooling / corpus jargon).
 /// Also merged with `styles/Vocab/canonic/accept.txt` when present (Vale vocab).
 fn domain_vocab_tokens() -> Vec<String> {
     let mut tokens: Vec<String> = [
-        "demo",
-        "resp",
         "jira",
         "pandoc",
         "jaccard",
         "tantivy",
         "bm25",
         "dedupe",
-        "surf",
-        "hpc",
-        "advisors",
         "canonic",
+        "resp",
         "confluence",
         "atlassian",
         "adf",
         "wiki",
         "sop",
+        "helpdesk",
     ]
     .into_iter()
     .map(str::to_string)
@@ -248,7 +245,7 @@ fn is_domain_vocab_spelling(snippet: &str, kind: &str) -> bool {
 
 /// Lint a single text buffer with in-process harper-core (unit-testable pure path).
 ///
-/// Spelling hits on domain vocabulary (Demo, HPC, …) are suppressed so CI can
+/// Spelling hits on domain vocabulary (Jira, Tantivy, …) are suppressed so CI can
 /// gate published responses without false positives on tooling jargon.
 pub fn lint_text_harper_inprocess(text: &str) -> Vec<LintFinding> {
     use harper_core::linting::{LintGroup, Linter};
@@ -513,12 +510,13 @@ mod tests {
 
     #[test]
     fn harper_suppresses_domain_vocab_spelling() {
-        let text = "Project space on the cluster is for active project data.\n\nRegards, Support Team\n";
+        // "Tantivy" / "canonic" are domain tokens; ensure Spelling hits on them are dropped.
+        let text = "The canonic tool indexes responses with Tantivy for search.\n";
         let findings = lint_text_harper_inprocess(text);
         assert!(
             findings.iter().all(|f| {
                 let m = f.message.to_lowercase();
-                !m.contains("'demo'") && !m.contains("'hpc'")
+                !m.contains("'tantivy'") && !m.contains("'canonic'")
             }),
             "domain spelling should be suppressed: {findings:?}"
         );
