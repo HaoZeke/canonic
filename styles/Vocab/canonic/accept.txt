@@ -15,3 +15,13 @@ canonic
 [Pp]at
 ADF
 [Ww]iki
+GPFS
+[Gg]rafana
+ReFrame
+EasyBuild
+CUDA
+MPI
+SBUs
+SBU
+RSC
+[Ss]lurm

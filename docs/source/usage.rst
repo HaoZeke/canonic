@@ -296,11 +296,26 @@ Front matter is enforced by ``canonic check``:
 
    - ``id`` and filename stem must match and start with ``resp-``
    - ``prefix: resp`` required (shared advisor library; no personal prefixes)
-   - ``sop:`` required — Confluence URL or literal ``none``
+   - ``sop:`` required — Confluence / service-desk wiki URL, or the literal
+     ``none`` when no SOP page exists yet
    - Closings must be team-generic (e.g. ``Support Team``), not personal names
 
 ``.gitignore`` excludes the Tantivy index under ``.canonic-index/`` and
-``corpus/imports/``.
+review drafts under ``corpus/imports/`` (never commit un-promoted imports).
+
+Team review via GitLab mirror
+-----------------------------
+
+For team merge-request review on a GitLab remote while the primary clone is
+elsewhere, mirror a branch:
+
+.. code:: shell
+
+   export CANONIC_GITLAB_REMOTE=git@gitlab.example.com:your-group/canonic.git
+   scripts/mirror-to-gitlab.sh
+
+Open the merge request on that GitLab. Do **not** bulk-push the library into
+Jira; only ``convert`` paste or explicit ``jira-comment`` publish one answer.
 
 CI quality gate
 ---------------

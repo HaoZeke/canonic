@@ -86,6 +86,17 @@ canonic check
 
 Agent day-to-day loop: install the in-repo skill at `.agents/skills/canonic-canned-loop/` (see that `SKILL.md`).
 
+### Team review (GitLab)
+
+Published wording should land via merge request. If your team reviews on GitLab while the public clone remote is GitHub:
+
+```bash
+export CANONIC_GITLAB_REMOTE=git@gitlab.example.com:your-group/canonic.git
+scripts/mirror-to-gitlab.sh
+```
+
+Import drafts stay under `corpus/imports/` (gitignored) until `canonic promote`. There is **no** bulk auto-sync of the library into Jira.
+
 ## Corpus layout (`resp` prefix)
 
 ```
@@ -108,10 +119,10 @@ sop: none
 
 - `id` and filename stem must match and start with `resp-`
 - `prefix: resp` required (shared advisor library; no personal prefixes)
-- `sop:` required — Confluence URL or literal `none`
+- `sop:` required — Confluence/service-desk wiki URL, or literal `none` when no SOP page exists yet
 - Closings must be team-generic (e.g. `Support Team`), not personal names
 
-`.gitignore` excludes the Tantivy index generated under `.canonic-index/`.
+`.gitignore` excludes the Tantivy index under `.canonic-index/` and review drafts under `corpus/imports/`.
 
 ## Usage
 
