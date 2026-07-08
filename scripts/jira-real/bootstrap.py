@@ -263,6 +263,16 @@ def main():
         else:
             raise SystemExit("project fail")
 
+    # Discover a non-subtask issue type available on this instance.
+    itype_name = "Task"
+    code, types = rest("GET", "/rest/api/2/issuetype")
+    if code == 200 and isinstance(types, list):
+        for t in types:
+            if not t.get("subtask") and t.get("name"):
+                itype_name = t["name"]
+                break
+    print("using issuetype", itype_name)
+
     issues = [
         (
             "Project space is not a backup",
@@ -276,10 +286,10 @@ def main():
             "How to request a software install on Demo cluster",
             ["canned-response", "software"],
             [
-                "h2. Software install requests\n\nPlease open a ticket with:\n* package name and version\n* why the central module stack is insufficient\n* license constraints if any\n\nWe prefer EasyBuild easyconfigs when available.\n\nRegards,\nSupport Team\n"
+                "h2. Software install requests\n\nPlease open a ticket with:\n* package name and version\n* why the central module stack is insufficient\n* license constraints if any\n\nWe prefer existing module recipes when available.\n\nRegards,\nSupport Team\n"
             ],
         ),
-        ("Unrelated networking question", ["networking"], ["Please use eduVPN for off-site access.\n"]),
+        ("Unrelated networking question", ["networking"], ["Please use the VPN for off-site access.\n"]),
         (
             "Project space backup policy (stale duplicate)",
             ["canned-response", "storage"],
@@ -290,6 +300,7 @@ def main():
     ]
     created = []
     for summary, labels, comments in issues:
+        # Create without labels first: many classic screens omit labels on create.
         code, body = rest(
             "POST",
             "/rest/api/2/issue",
@@ -297,14 +308,15 @@ def main():
                 "fields": {
                     "project": {"key": "HSP"},
                     "summary": summary,
-                    "issuetype": {"name": "Task"},
-                    "labels": labels,
+                    "issuetype": {"name": itype_name},
                 }
             },
         )
         print("issue", summary[:40], code, body if code >= 300 else body.get("key"))
-        if code not in (200, 201):
-            for it in ("Bug", "Story", "New Feature", "Improvement"):
+        if code not in (200, 201) and isinstance(types, list):
+            for t in types:
+                if t.get("subtask"):
+                    continue
                 code, body = rest(
                     "POST",
                     "/rest/api/2/issue",
@@ -312,18 +324,26 @@ def main():
                         "fields": {
                             "project": {"key": "HSP"},
                             "summary": summary,
-                            "issuetype": {"name": it},
-                            "labels": labels,
+                            "issuetype": {"id": t["id"]},
                         }
                     },
                 )
+                print("  try type", t.get("name"), code, body if code >= 300 else body.get("key"))
                 if code in (200, 201):
                     break
-            print(" retry", code, body if code >= 300 else body.get("key"))
         if code not in (200, 201):
             raise SystemExit("issue fail " + summary)
         key = body["key"]
         created.append(key)
+        # Labels via update (edit screen usually allows this even when create does not).
+        for payload in (
+            {"fields": {"labels": labels}},
+            {"update": {"labels": [{"set": labels}]}},
+        ):
+            lc, lbody = rest("PUT", f"/rest/api/2/issue/{key}", payload)
+            print("  labels", key, labels, lc, lbody if lc >= 300 else "ok")
+            if lc < 300:
+                break
         for c in comments:
             cc, _ = rest("POST", f"/rest/api/2/issue/{key}/comment", {"body": c})
             print("  comment", key, cc)
@@ -334,6 +354,14 @@ def main():
         "/rest/api/2/search?" + urlencode({"jql": jql, "fields": "summary,labels"}),
     )
     print("SEARCH", code, json.dumps(body)[:1500])
+    if code != 200 or body.get("total", 0) < 3:
+        # Fallback JQL if labels still unavailable: match by summary keywords.
+        jql2 = 'project = HSP AND summary ~ "project space" ORDER BY key'
+        code2, body2 = rest(
+            "GET",
+            "/rest/api/2/search?" + urlencode({"jql": jql2, "fields": "summary"}),
+        )
+        print("SEARCH_FALLBACK", code2, json.dumps(body2)[:800])
     print("CREATED", created)
     print("ONESHOT_OK")
 
