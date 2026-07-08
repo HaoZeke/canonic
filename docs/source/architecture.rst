@@ -45,3 +45,21 @@ The CLI is a thin clap front end over the ``canonic`` library crate:
 
 Full API documentation is generated with **rustdoc** and linked from
 :doc:`api`.
+
+Free Jira platform map
+----------------------
+
+canonic uses only **native** Jira REST (Cloud Free API tokens or Server/DC
+PAT) — no Marketplace apps:
+
++------------------+-----------------------------------------------+---------------------------+
+| Command          | Endpoint                                      | Body / notes              |
++==================+===============================================+===========================+
+| ``jira-probe``   | ``GET /rest/api/2/myself`` (+ serverInfo)     | reports Cloud vs Server   |
++------------------+-----------------------------------------------+---------------------------+
+| ``import-jira``  | ``GET …/search`` (v2, then v3/jql fallback)   | comments wiki **or** ADF  |
+|                  | ``GET …/issue/{key}/comment``                  |                           |
++------------------+-----------------------------------------------+---------------------------+
+| ``jira-comment`` | Server: ``POST /rest/api/2/…/comment``        | wiki string               |
+|                  | Cloud: ``POST /rest/api/3/…/comment``         | minimal free ADF          |
++------------------+-----------------------------------------------+---------------------------+

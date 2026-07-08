@@ -142,9 +142,10 @@ Mapped to **official Atlassian platform REST** (Cloud Free API tokens or Server/
 
 | canonic | Free platform endpoint | Host notes |
 |---------|------------------------|------------|
-| `jira-probe` | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud + Server |
-| `import-jira` | `GET /rest/api/2/search?jql=…` then `GET …/issue/{key}/comment` | Server/DC stable; Cloud Free still exposes v2 |
+| `jira-probe` | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud + Server; reports wiki vs ADF write path |
+| `import-jira` | `GET …/search` (api/2, then api/3 + `/search/jql` fallback) · `GET …/issue/{key}/comment` (api/2 then 3) | Free-tier only; no Marketplace apps |
 | `jira-comment` | **Server/DC:** `POST /rest/api/2/issue/{key}/comment` wiki `{"body":"…"}` · **Cloud Free:** `POST /rest/api/3/issue/{key}/comment` minimal **ADF** body | Auto from host (`*.atlassian.net` → ADF) |
+| `doctor` | optional probe when `JIRA_BASE_URL` set | Non-critical; unset env is fine |
 
 ```bash
 # Probe connectivity + identity
@@ -165,6 +166,7 @@ canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud 
 
 - Import reads wiki **or** Cloud ADF comment bodies (ADF flattened to text, then pandoc `jira`→markdown when applicable).
 - Write is **one file → one issue comment**, human-gated — not bulk library sync.
+- `canonic doctor` reports free Jira status only when `JIRA_BASE_URL` is set (probe failure does not fail the critical path).
 
 Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
 

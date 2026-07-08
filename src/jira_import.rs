@@ -16,6 +16,15 @@ use crate::convert::convert_jira_to_markdown;
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+fn http_client() -> Result<reqwest::blocking::Client> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .context("build HTTP client")
+}
 
 /// Where imported drafts land by default (never auto-indexed or quality-checked).
 pub fn default_import_dir() -> PathBuf {
@@ -269,17 +278,32 @@ fn parse_comments_response(json: &str) -> Result<Vec<IssueComment>> {
         .collect())
 }
 
-fn build_search_request(
+/// Free search URL candidates (Server v2 first; Cloud Free may prefer v3).
+fn search_url_candidates(base_url: &str) -> Vec<String> {
+    let base = base_url.trim_end_matches('/');
+    let mut urls = vec![format!("{base}/rest/api/2/search")];
+    if is_cloud_host(base_url) {
+        urls.push(format!("{base}/rest/api/3/search"));
+        urls.push(format!("{base}/rest/api/3/search/jql"));
+    } else {
+        // Still try v3 paths for forward-compat fixtures / hybrid hosts.
+        urls.push(format!("{base}/rest/api/3/search"));
+        urls.push(format!("{base}/rest/api/3/search/jql"));
+    }
+    urls
+}
+
+fn build_search_request_at(
     client: &reqwest::blocking::Client,
     cfg: &JiraConfig,
+    url: &str,
     jql: &str,
     start_at: u32,
     max_results: u32,
 ) -> reqwest::Result<reqwest::blocking::Request> {
-    let url = format!("{}/rest/api/2/search", cfg.base_url.trim_end_matches('/'));
     let start_at_s = start_at.to_string();
     let max_results_s = max_results.to_string();
-    let req = client.get(&url).query(&[
+    let req = client.get(url).query(&[
         ("jql", jql),
         ("startAt", start_at_s.as_str()),
         ("maxResults", max_results_s.as_str()),
@@ -288,36 +312,75 @@ fn build_search_request(
     apply_auth(req, &cfg.auth).build()
 }
 
-fn build_comments_request(
+fn build_comments_request_at(
     client: &reqwest::blocking::Client,
     cfg: &JiraConfig,
     issue_key: &str,
+    api: &str,
 ) -> reqwest::Result<reqwest::blocking::Request> {
     let url = format!(
-        "{}/rest/api/2/issue/{issue_key}/comment",
+        "{}/rest/api/{api}/issue/{issue_key}/comment",
         cfg.base_url.trim_end_matches('/')
     );
     apply_auth(client.get(&url), &cfg.auth).build()
 }
 
+/// Execute one free-tier search page, trying platform URL candidates on failure.
+fn search_page(
+    client: &reqwest::blocking::Client,
+    cfg: &JiraConfig,
+    jql: &str,
+    start_at: u32,
+    page_size: u32,
+) -> Result<(Vec<IssueSummary>, u32, u32, String)> {
+    let mut last_err = None;
+    for url in search_url_candidates(&cfg.base_url) {
+        let req = match build_search_request_at(client, cfg, &url, jql, start_at, page_size) {
+            Ok(r) => r,
+            Err(e) => {
+                last_err = Some(anyhow::anyhow!("build search {url}: {e}"));
+                continue;
+            }
+        };
+        let resp = match client.execute(req) {
+            Ok(r) => r,
+            Err(e) => {
+                last_err = Some(anyhow::anyhow!("send search {url}: {e}"));
+                continue;
+            }
+        };
+        if !resp.status().is_success() {
+            last_err = Some(anyhow::anyhow!(
+                "Jira search HTTP {} at {url}",
+                resp.status()
+            ));
+            // try next candidate on 404/410/400/405 (deprecated/moved Cloud paths)
+            if matches!(resp.status().as_u16(), 400 | 404 | 405 | 410) {
+                continue;
+            }
+            bail!(last_err.unwrap());
+        }
+        let body = resp.text().context("read Jira search response")?;
+        let (issues, start, total) = parse_search_response(&body)?;
+        return Ok((issues, start, total, url));
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("Jira search failed on all free endpoints")))
+}
+
 /// Search for issues matching `jql`, paginating until Jira reports no more.
+///
+/// Tries free platform search paths in order (api/2 then Cloud api/3 variants).
 pub fn search_all_issues(
     cfg: &JiraConfig,
     jql: &str,
     page_size: u32,
 ) -> Result<Vec<IssueSummary>> {
-    let client = reqwest::blocking::Client::new();
+    let client = http_client()?;
     let mut out = Vec::new();
     let mut start_at = 0u32;
     loop {
-        let req = build_search_request(&client, cfg, jql, start_at, page_size)
-            .context("build Jira search request")?;
-        let resp = client.execute(req).context("send Jira search request")?;
-        if !resp.status().is_success() {
-            bail!("Jira search failed: HTTP {}", resp.status());
-        }
-        let body = resp.text().context("read Jira search response")?;
-        let (mut issues, returned_start, total) = parse_search_response(&body)?;
+        let (mut issues, returned_start, total, _url) =
+            search_page(&client, cfg, jql, start_at, page_size)?;
         let got = issues.len() as u32;
         out.append(&mut issues);
         if got == 0 || returned_start + got >= total {
@@ -328,22 +391,32 @@ pub fn search_all_issues(
     Ok(out)
 }
 
-/// Fetch all comments for one issue.
+/// Fetch all comments for one issue (api/2, then api/3 on Cloud-style hosts).
 pub fn fetch_comments(cfg: &JiraConfig, issue_key: &str) -> Result<Vec<IssueComment>> {
-    let client = reqwest::blocking::Client::new();
-    let req = build_comments_request(&client, cfg, issue_key)
-        .with_context(|| format!("build comments request for {issue_key}"))?;
-    let resp = client
-        .execute(req)
-        .with_context(|| format!("fetch comments for {issue_key}"))?;
-    if !resp.status().is_success() {
-        bail!(
-            "fetching comments for {issue_key} failed: HTTP {}",
-            resp.status()
-        );
+    let client = http_client()?;
+    // Try classic v2 first (Server/DC + Cloud Free still expose it), then v3.
+    let mut last_status = None;
+    for api in ["2", "3"] {
+        let req = build_comments_request_at(&client, cfg, issue_key, api)
+            .with_context(|| format!("build comments request for {issue_key} api/{api}"))?;
+        let resp = client
+            .execute(req)
+            .with_context(|| format!("fetch comments for {issue_key}"))?;
+        if resp.status().is_success() {
+            let body = resp.text().context("read Jira comments response")?;
+            return parse_comments_response(&body);
+        }
+        last_status = Some(resp.status());
+        if !matches!(resp.status().as_u16(), 404 | 410 | 405) {
+            break;
+        }
     }
-    let body = resp.text().context("read Jira comments response")?;
-    parse_comments_response(&body)
+    bail!(
+        "fetching comments for {issue_key} failed: HTTP {}",
+        last_status
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown".into())
+    )
 }
 
 /// Turn a title into a slug: lowercase ASCII alphanumerics, everything else
@@ -441,6 +514,10 @@ pub struct JiraProbe {
     pub account: String,
     pub server_title: Option<String>,
     pub server_version: Option<String>,
+    /// Cloud Free-style host (`*.atlassian.net`) vs Server/DC-style.
+    pub cloud_host: bool,
+    /// Resolved free comment write format for this host.
+    pub comment_format: CommentBodyFormat,
 }
 
 #[derive(Debug, Deserialize)]
@@ -509,7 +586,7 @@ fn build_server_info_request(
 /// Uses only platform endpoints (`/rest/api/2/myself`, `/serverInfo`) — no
 /// Marketplace apps. Exit path for CLI: non-zero when HTTP fails or auth rejects.
 pub fn probe_jira(cfg: &JiraConfig) -> Result<JiraProbe> {
-    let client = reqwest::blocking::Client::new();
+    let client = http_client()?;
     let req = build_myself_request(&client, cfg).context("build /myself request")?;
     let resp = client.execute(req).context("send /myself request")?;
     if !resp.status().is_success() {
@@ -536,21 +613,37 @@ pub fn probe_jira(cfg: &JiraConfig) -> Result<JiraProbe> {
         }
     }
 
+    let base = cfg.base_url.trim_end_matches('/').to_string();
+    let cloud = is_cloud_host(&base);
     Ok(JiraProbe {
-        base_url: cfg.base_url.trim_end_matches('/').to_string(),
+        base_url: base.clone(),
         display_name,
         account,
         server_title,
         server_version,
+        cloud_host: cloud,
+        comment_format: CommentBodyFormat::Auto.resolve(&base),
     })
 }
 
 /// Format a probe result for CLI stdout.
 pub fn format_probe(probe: &JiraProbe) -> String {
+    let host = if probe.cloud_host {
+        "Cloud Free/Standard host (platform REST)"
+    } else {
+        "Server/Data Center-style host (platform REST)"
+    };
+    let write = match probe.comment_format {
+        CommentBodyFormat::Adf => "POST /rest/api/3/issue/{key}/comment (ADF body)",
+        CommentBodyFormat::Wiki => "POST /rest/api/2/issue/{key}/comment (wiki body)",
+        CommentBodyFormat::Auto => "auto",
+    };
     let mut lines = vec![
         format!("jira: ok — free REST platform API (no Marketplace apps)"),
         format!("  base: {}", probe.base_url),
+        format!("  host: {host}"),
         format!("  user: {} ({})", probe.display_name, probe.account),
+        format!("  comment write: {write}"),
     ];
     if let Some(ref t) = probe.server_title {
         lines.push(format!("  server: {t}"));
@@ -559,7 +652,7 @@ pub fn format_probe(probe: &JiraProbe) -> String {
         lines.push(format!("  version: {v}"));
     }
     lines.push(
-        "  note: write uses POST issue comment only; bulk library sync stays human-gated"
+        "  note: write is explicit one-shot comment only; bulk library sync stays human-gated"
             .into(),
     );
     lines.join("\n") + "\n"
@@ -653,7 +746,7 @@ pub fn post_issue_comment_with_format(
         bail!("comment body is empty");
     }
     let resolved = format.resolve(&cfg.base_url);
-    let client = reqwest::blocking::Client::new();
+    let client = http_client()?;
     let req = build_comment_post_request(&client, cfg, issue_key, body_wiki, resolved)
         .with_context(|| format!("build comment POST for {issue_key}"))?;
     let resp = client
@@ -793,12 +886,16 @@ mod tests {
                 token: "tok".into(),
             },
         );
-        let req = build_search_request(&client, &cfg, "project = HSP", 0, 50).unwrap();
+        let url = "https://example.atlassian.net/rest/api/2/search";
+        let req = build_search_request_at(&client, &cfg, url, "project = HSP", 0, 50).unwrap();
         assert_eq!(req.url().path(), "/rest/api/2/search");
         let query = req.url().query().unwrap_or_default();
         assert!(query.contains("jql=project"), "{query}");
         assert!(query.contains("maxResults=50"), "{query}");
         assert!(req.headers().contains_key(reqwest::header::AUTHORIZATION));
+        let candidates = search_url_candidates("https://acme.atlassian.net");
+        assert!(candidates.iter().any(|u| u.ends_with("/rest/api/2/search")));
+        assert!(candidates.iter().any(|u| u.contains("/rest/api/3/search")));
     }
 
     #[test]
@@ -808,7 +905,7 @@ mod tests {
             "https://jira.example.org",
             JiraAuth::Header("Bearer some-pat".into()),
         );
-        let req = build_comments_request(&client, &cfg, "HSP-1").unwrap();
+        let req = build_comments_request_at(&client, &cfg, "HSP-1", "2").unwrap();
         assert_eq!(req.url().path(), "/rest/api/2/issue/HSP-1/comment");
         assert_eq!(
             req.headers()
@@ -892,11 +989,14 @@ mod tests {
             account: "abc-123".into(),
             server_title: Some("canonic-smoke".into()),
             server_version: Some("9.12.15".into()),
+            cloud_host: true,
+            comment_format: CommentBodyFormat::Adf,
         });
         assert!(text.contains("free REST"));
         assert!(text.contains("Advisor User"));
         assert!(text.contains("Marketplace") || text.contains("no Marketplace"));
         assert!(text.contains("https://example.atlassian.net"));
+        assert!(text.contains("Cloud") || text.contains("ADF") || text.contains("api/3"));
     }
 
     #[test]

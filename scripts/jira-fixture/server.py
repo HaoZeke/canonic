@@ -19,8 +19,10 @@ import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import os
+
 HOST = "0.0.0.0"
-PORT = 8080
+PORT = int(os.environ.get("CANONIC_JIRA_FIXTURE_PORT", "8080"))
 
 # Disposable fixture-only credentials (local container smoke — not production secrets).
 USER = "advisor"
@@ -232,7 +234,14 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
-        if path == "/rest/api/2/search" or path == "/rest/api/2/search/":
+        if path in (
+            "/rest/api/2/search",
+            "/rest/api/2/search/",
+            "/rest/api/3/search",
+            "/rest/api/3/search/",
+            "/rest/api/3/search/jql",
+            "/rest/api/3/search/jql/",
+        ):
             jql = qs.get("jql", [""])[0]
             start = int(qs.get("startAt", ["0"])[0])
             max_r = int(qs.get("maxResults", ["50"])[0])
@@ -256,7 +265,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, payload)
             return
 
-        m = re.fullmatch(r"/rest/api/2/issue/([A-Z]+-\d+)/comment", path)
+        m = re.fullmatch(r"/rest/api/[23]/issue/([A-Z]+-\d+)/comment", path)
         if m:
             key = m.group(1)
             issue = next((i for i in ISSUES if i["key"] == key), None)

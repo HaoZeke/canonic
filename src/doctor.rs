@@ -19,7 +19,7 @@ impl ToolStatus {
     }
 }
 
-/// Probe pandoc, vale, Harper CLI, and in-process harper-core.
+/// Probe pandoc, vale, Harper CLI, in-process harper-core, and optional free Jira.
 pub fn collect_statuses() -> Vec<ToolStatus> {
     let mut out = Vec::new();
 
@@ -73,7 +73,51 @@ pub fn collect_statuses() -> Vec<ToolStatus> {
         },
     });
 
+    // Optional free-tier Jira: only when env is configured (never fails doctor critical).
+    out.push(jira_env_status());
+
     out
+}
+
+/// Report free Jira env + quick probe when `JIRA_BASE_URL` is set.
+fn jira_env_status() -> ToolStatus {
+    if std::env::var_os("JIRA_BASE_URL").is_none() {
+        return ToolStatus {
+            name: "jira".into(),
+            present: false,
+            detail: "JIRA_BASE_URL unset (optional; set for jira-probe / import-jira / jira-comment)"
+                .into(),
+        };
+    }
+    match crate::jira_import::JiraConfig::from_env() {
+        Ok(cfg) => match crate::jira_import::probe_jira(&cfg) {
+            Ok(probe) => {
+                let fmt = match probe.comment_format {
+                    crate::jira_import::CommentBodyFormat::Adf => "ADF/v3",
+                    crate::jira_import::CommentBodyFormat::Wiki => "wiki/v2",
+                    crate::jira_import::CommentBodyFormat::Auto => "auto",
+                };
+                ToolStatus {
+                    name: "jira".into(),
+                    present: true,
+                    detail: format!(
+                        "ok free platform REST — {} ({fmt}; no Marketplace apps)",
+                        probe.display_name
+                    ),
+                }
+            }
+            Err(e) => ToolStatus {
+                name: "jira".into(),
+                present: false,
+                detail: format!("JIRA_BASE_URL set but probe failed: {e:#}"),
+            },
+        },
+        Err(e) => ToolStatus {
+            name: "jira".into(),
+            present: false,
+            detail: format!("Jira env incomplete: {e:#}"),
+        },
+    }
 }
 
 /// Human-readable multi-line doctor report (never empty of named tools).
@@ -100,10 +144,17 @@ mod tests {
 
     #[test]
     fn doctor_names_pandoc_vale_and_harper() {
+        // Isolate optional Jira probe from ambient builder env.
+        let prev = std::env::var_os("JIRA_BASE_URL");
+        std::env::remove_var("JIRA_BASE_URL");
         let statuses = collect_statuses();
+        if let Some(v) = prev {
+            std::env::set_var("JIRA_BASE_URL", v);
+        }
         let names: Vec<_> = statuses.iter().map(|s| s.name.as_str()).collect();
         assert!(names.contains(&"pandoc"), "{names:?}");
         assert!(names.contains(&"vale"), "{names:?}");
+        assert!(names.contains(&"jira"), "{names:?}");
         assert!(
             names.iter().any(|n| n.contains("harper")),
             "expected harper status, got {names:?}"
