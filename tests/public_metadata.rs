@@ -273,3 +273,17 @@ fn gitignore_covers_agent_and_docs_artifacts() {
     assert!(gi.contains(".venv-docs") || gi.contains("venv"));
     assert!(gi.contains("/target") || gi.contains("target"));
 }
+
+#[test]
+fn usage_docs_cover_tui_and_command_loop() {
+    let usage = read("docs/source/usage.rst");
+    assert!(usage.contains("canonic tui") || usage.contains("``tui``"));
+    assert!(usage.contains("Interactive TUI") || usage.contains("tui-section"));
+    assert!(usage.contains("promote"));
+    assert!(usage.contains("Command reference") || usage.contains("command reference") || usage.contains("list-table"));
+    let readme = read("README.md");
+    assert!(readme.contains("canonic tui"));
+    assert!(readme.contains("ratatui") || readme.contains("Interactive TUI"));
+    let skill = read(".agents/skills/canonic-canned-loop/SKILL.md");
+    assert!(skill.contains("tui"));
+}

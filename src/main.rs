@@ -12,6 +12,7 @@ use canonic::jira_import::{
 };
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use canonic::scaffold::{promote_to_corpus, write_scaffold, ScaffoldOptions};
+use canonic::tui::run_tui;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -31,6 +32,11 @@ struct Cli {
 enum Commands {
     /// Report presence of pandoc, Vale, Harper CLI, and in-process harper-core
     Doctor,
+    /// Interactive corpus browser (ratatui): list, filter, check, convert preview
+    Tui {
+        #[arg(long)]
+        corpus: Option<PathBuf>,
+    },
     /// List canned responses in the corpus
     List {
         #[arg(long)]
@@ -197,6 +203,11 @@ fn run() -> Result<ExitCode> {
             } else {
                 Ok(ExitCode::from(1))
             }
+        }
+        Commands::Tui { corpus } => {
+            let corpus = corpus.unwrap_or_else(default_corpus_dir);
+            run_tui(corpus)?;
+            Ok(ExitCode::SUCCESS)
         }
         Commands::List { corpus } => {
             let corpus = corpus.unwrap_or_else(default_corpus_dir);

@@ -118,6 +118,7 @@ sop: none
 ```bash
 canonic doctor
 canonic list
+canonic tui                            # interactive ratatui browser
 canonic new "Project space is not a backup" --tags storage
 canonic check                          # quality gate (exit 1 on findings)
 canonic lint --engine harper           # in-process harper-core (CI uses this)
@@ -132,6 +133,38 @@ JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIR
   canonic import-jira "project = HSP AND labels = canned-response" --dry-run
 canonic promote corpus/imports/resp-some-topic-hsp-101.md
 ```
+
+| Command | Purpose |
+|---------|---------|
+| `doctor` | Tooling + optional Jira env probe |
+| `tui` | Browse / filter / check / convert-preview (never posts to Jira) |
+| `list` / `new` / `promote` | Inventory, scaffold, import→responses after check |
+| `check` / `lint` | Quality gate + Harper (CI uses `--engine harper`) |
+| `convert` | Markdown → Jira wiki (pandoc) |
+| `reindex` / `search` / `dedupe` | Local Tantivy BM25 + near-duplicates |
+| `jira-probe` / `import-jira` / `jira-comment` | Free platform REST only (no Marketplace apps) |
+
+Full recipes, keybindings, exit codes, and the free REST map: **[docs/source/usage.rst](docs/source/usage.rst)** (HTML via `./docs/build.sh` → Usage).
+
+### Interactive TUI
+
+```bash
+canonic tui
+canonic tui --corpus corpus/responses
+```
+
+| Key | Action |
+|-----|--------|
+| `j`/`k` or arrows | Move selection |
+| `/` | Filter by id, title, tags, body |
+| `C` | Check whole corpus |
+| `c` | Convert selection → jira wiki **preview** (pandoc) |
+| `l` | Lint selection (harper-core) |
+| `r` / `s` | Reindex / search |
+| `R` | Reload from disk |
+| `?` | Help · `q` quit |
+
+The TUI never POSTs to Jira; use `jira-comment` for an explicit one-shot write.
 
 ### Dedupe
 

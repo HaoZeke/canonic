@@ -62,8 +62,8 @@ Workflow at a glance
      <li>
        <span class="cn-flow-n">4</span>
        <span class="cn-flow-title">Publish to Jira</span>
-       <span class="cn-flow-desc">Human paste of wiki markup; import path writes drafts only.</span>
-       <span class="cn-flow-cmd">canonic convert</span>
+       <span class="cn-flow-desc">Convert or explicit one-shot comment; imports stay drafts until promote.</span>
+       <span class="cn-flow-cmd">canonic convert · jira-comment · tui</span>
      </li>
    </ol>
 

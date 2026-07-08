@@ -72,6 +72,7 @@ canonic new "Queue limits" --id resp-queue-limits --sop none --out corpus/respon
 canonic check
 canonic lint --engine harper          # in-process harper-core; Vale optional
 canonic list
+canonic tui                           # browse / filter / convert preview (no Jira POST)
 ```
 
 ### 5. Promote import → published corpus
@@ -104,10 +105,20 @@ GitHub Actions runs `cargo test --locked --all-targets`, then corpus `check` and
 in-process Harper lint on `corpus/responses/`, plus a convert smoke when pandoc
 is installed. Keep published responses check-clean so CI stays green.
 
+## TUI keys (quick)
+
+| Key | Action |
+|-----|--------|
+| `j`/`k` | Move · `/` filter · `C` check · `c` convert preview |
+| `l` lint · `r` reindex · `s` search · `q` quit |
+
+Full usage: `docs/source/usage.rst` and README **Usage** section.
+
 ## Agent checklist
 
 1. Prefer `canonic new` over hand-copying front matter.
 2. Never write import drafts straight into `corpus/responses/` without `promote`.
 3. Run `check` (and `lint --engine harper`) before convert or `jira-comment`.
-4. Do not invent bulk sync or paid Jira extensions.
-5. Leave production tickets out of git until a human promotes a reviewed draft.
+4. Use `canonic tui` for browse/filter/convert preview — it does **not** post to Jira.
+5. Do not invent bulk sync or paid Jira extensions.
+6. Leave production tickets out of git until a human promotes a reviewed draft.

@@ -14,6 +14,7 @@
 //! | [`doctor`] | Tooling probes |
 //! | [`jira_import`] | Free REST probe, read import, explicit comment POST |
 //! | [`scaffold`] | New `resp-` templates and promote import → responses |
+//! | [`tui`] | Interactive ratatui corpus browser (`canonic tui`) |
 //!
 //! ## Example
 //!
@@ -41,6 +42,7 @@ pub mod index;
 pub mod jira_import;
 pub mod lint;
 pub mod scaffold;
+pub mod tui;
 
 pub use check::{check_corpus, check_responses, format_check_report, CheckReport, REQUIRED_PREFIX};
 pub use convert::{
@@ -66,3 +68,4 @@ pub use scaffold::{
     check_response_path, promote_to_corpus, resolve_response_id, scaffold_markdown, write_scaffold,
     ScaffoldOptions, TEAM_SIGN_OFF,
 };
+pub use tui::{run_tui, App as TuiApp};
