@@ -1,0 +1,90 @@
+/* Landing hero — canonical response seal + teal system */
+.cn-hero {
+  margin: 0 0 1.75rem;
+  padding: 1.6rem 1.4rem 1.35rem;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(45, 212, 191, 0.18), transparent 55%),
+    linear-gradient(145deg, #f0fdfa 0%, #ecfeff 42%, #f8fafc 100%);
+  border: 1px solid #99f6e4;
+  box-shadow: 0 1px 0 rgba(15, 118, 110, 0.06);
+}
+html.dark .cn-hero {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(20, 184, 166, 0.16), transparent 55%),
+    linear-gradient(145deg, #042f2e 0%, #0f172a 100%);
+  border-color: #115e59;
+  box-shadow: none;
+}
+
+.cn-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 0.85rem;
+}
+.cn-hero-mark {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.22);
+}
+html.dark .cn-hero-mark {
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.cn-hero-name {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.15rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: #115e59;
+}
+html.dark .cn-hero-name { color: #ccfbf1; }
+
+.cn-hero-logo {
+  display: block;
+  max-width: min(320px, 78vw);
+  height: auto;
+  margin: 0 0 0.75rem;
+}
+/* Prefer brand row: hide ALL wordmark logos that follow it (light + dark). */
+.cn-hero-brand ~ .cn-hero-logo { display: none !important; }
+html.dark .cn-hero:not(:has(.cn-hero-brand)) .cn-hero-logo-light { display: none; }
+html:not(.dark) .cn-hero:not(:has(.cn-hero-brand)) .cn-hero-logo-dark { display: none; }
+
+.cn-hero-tagline {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.5;
+  color: #134e4a;
+  max-width: 42rem;
+}
+html.dark .cn-hero-tagline { color: #99f6e4; }
+
+.cn-hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+.cn-hero-pills span {
+  font-size: 0.78rem;
+  padding: 0.22rem 0.62rem;
+  border-radius: 999px;
+  background: #ccfbf1;
+  color: #115e59;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+html.dark .cn-hero-pills span {
+  background: #115e59;
+  color: #ecfdf5;
+}
+
+.sy-head-brand img,
+.sidebar-logo {
+  border-radius: 6px;
+}

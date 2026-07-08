@@ -1,6 +1,23 @@
 # canonic
 
+<p align="center">
+  <img src="docs/source/_static/logo.svg" width="280" alt="canonic logo" />
+</p>
+
 **Canonical** canned-response corpus for the generic Jira Jira work: version-controlled **markdown** under a shared **`resp-`** prefix is the source of truth. Convert with **pandoc**, enforce **quality checks** before migration, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
+
+## Docs site (Shibuya)
+
+Sphinx + [Shibuya](https://shibuya.lepture.com/) themed HTML lives under `docs/`. Build from the repo root:
+
+```bash
+./docs/build.sh
+# open docs/build/index.html
+# optional local server:
+python3 -m http.server -d docs/build 8000
+```
+
+The script creates `.venv-docs` if needed, installs `docs/requirements.txt` (Sphinx, Shibuya, sphinx-design, sphinx-copybutton), and runs `sphinx-build`. Branding assets are in `docs/source/_static/` (`logo.svg`, `logo-dark.svg`, `favicon.svg`, `mark.svg`).
 
 ## Requirements
 
