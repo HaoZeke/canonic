@@ -109,6 +109,24 @@ ISSUES = [
 ]
 
 
+def _adf_to_text(node: object) -> str:
+    """Minimal ADF → plain text (mirrors free Cloud comment bodies)."""
+    parts: list[str] = []
+
+    def walk(n: object) -> None:
+        if isinstance(n, dict):
+            if isinstance(n.get("text"), str):
+                parts.append(n["text"])
+            for child in n.get("content") or []:
+                walk(child)
+        elif isinstance(n, list):
+            for child in n:
+                walk(child)
+
+    walk(node)
+    return " ".join(parts).strip()
+
+
 def _auth_ok(handler: BaseHTTPRequestHandler) -> bool:
     header = handler.headers.get("Authorization", "")
     if header.startswith("Basic "):
@@ -285,7 +303,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"errorMessages": ["invalid JSON"]})
             return
 
-        m = re.fullmatch(r"/rest/api/2/issue/([A-Z]+-\d+)/comment", path)
+        # Cloud Free: /rest/api/3/.../comment (ADF); Server/DC: /rest/api/2/... (wiki)
+        m = re.fullmatch(r"/rest/api/[23]/issue/([A-Z]+-\d+)/comment", path)
         if m:
             key = m.group(1)
             issue = next((i for i in ISSUES if i["key"] == key), None)
@@ -293,7 +312,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(404, {"errorMessages": [f"Issue Does Not Exist: {key}"]})
                 return
             body = payload.get("body")
-            if not body or not str(body).strip():
+            # Free Cloud uses ADF objects; Server/DC uses wiki strings (platform REST).
+            if isinstance(body, dict):
+                body_text = _adf_to_text(body)
+            else:
+                body_text = str(body or "").strip()
+            if not body_text:
                 self._json(400, {"errorMessages": ["comment body required"]})
                 return
             created = "2026-07-08T12:00:00.000+0000"
@@ -302,7 +326,7 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "author": "Fixture Advisor",
                     "created": created,
-                    "body": str(body),
+                    "body": body_text,
                 }
             )
             self._json(
@@ -313,7 +337,7 @@ class Handler(BaseHTTPRequestHandler):
                         "name": USER,
                         "displayName": "Fixture Advisor",
                     },
-                    "body": str(body),
+                    "body": body_text,
                     "created": created,
                     "updated": created,
                 },

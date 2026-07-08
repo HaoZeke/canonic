@@ -52,8 +52,10 @@ pub use index::{
     search, self_query_for, tokenize, DedupePair, IndexDoc, SearchHit,
 };
 pub use jira_import::{
-    default_import_dir, format_probe, import_jira, post_comment_from_markdown, post_issue_comment,
-    probe_jira, JiraAuth, JiraConfig, JiraProbe, PostedComment,
+    comment_body_to_text, default_import_dir, format_probe, import_jira, is_cloud_host,
+    plain_text_to_adf, post_comment_from_markdown, post_comment_from_markdown_with_format,
+    post_issue_comment, post_issue_comment_with_format, probe_jira, CommentBodyFormat, JiraAuth,
+    JiraConfig, JiraProbe, PostedComment,
 };
 pub use lint::{
     format_report, lint_paths, lint_text_harper_inprocess, LintEngine, LintFinding, LintReport,

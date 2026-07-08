@@ -138,10 +138,16 @@ JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIR
 
 ### Free Jira REST (no paid Marketplace apps)
 
-canonic talks only to **native Jira platform REST** (Cloud Free API tokens or Server/Data Center PAT). It does **not** use paid Marketplace apps, ScriptRunner, or Service Desk “canned response admin” product APIs.
+Mapped to **official Atlassian platform REST** (Cloud Free API tokens or Server/Data Center PAT). No Marketplace apps, ScriptRunner, or JSM canned-response admin product APIs.
+
+| canonic | Free platform endpoint | Host notes |
+|---------|------------------------|------------|
+| `jira-probe` | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud + Server |
+| `import-jira` | `GET /rest/api/2/search?jql=…` then `GET …/issue/{key}/comment` | Server/DC stable; Cloud Free still exposes v2 |
+| `jira-comment` | **Server/DC:** `POST /rest/api/2/issue/{key}/comment` wiki `{"body":"…"}` · **Cloud Free:** `POST /rest/api/3/issue/{key}/comment` minimal **ADF** body | Auto from host (`*.atlassian.net` → ADF) |
 
 ```bash
-# Probe connectivity + identity (GET /rest/api/2/myself)
+# Probe connectivity + identity
 JIRA_BASE_URL=https://your-instance.atlassian.net \
 JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
   canonic jira-probe
@@ -150,14 +156,15 @@ JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
 canonic import-jira "project = HSP AND labels = canned-response" --dry-run
 canonic import-jira "project = HSP AND labels = canned-response"
 
-# Explicit write: convert one markdown file with pandoc jira and POST as an issue comment
+# Explicit write: pandoc jira → free REST comment (Cloud ADF / Server wiki)
 canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
 canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md
+canonic jira-comment --issue HSP-101 PATH.md --body-format wiki   # force Server/DC
+canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud ADF
 ```
 
-- **Read:** `import-jira` → `GET /search` + `GET /issue/{key}/comment` → drafts under `corpus/imports/`.
-- **Write:** `jira-comment` → `POST /issue/{key}/comment` with pandoc `jira` wiki body only. No unattended bulk library sync; review-before-migrate still applies.
-- Bodies use free-compatible wiki markup from pandoc’s `jira` writer (not ADF-only Marketplace formatters).
+- Import reads wiki **or** Cloud ADF comment bodies (ADF flattened to text, then pandoc `jira`→markdown when applicable).
+- Write is **one file → one issue comment**, human-gated — not bulk library sync.
 
 Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
 

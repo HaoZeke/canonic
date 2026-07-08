@@ -1,12 +1,16 @@
-//! Free-tier Jira REST API v2 (platform only — no Marketplace apps).
+//! Free-tier Jira **platform** REST only (no Marketplace apps).
 //!
-//! - **Probe:** `GET /rest/api/2/myself` (+ serverInfo) for connectivity/auth.
-//! - **Read:** JQL search + issue comments → review drafts under `corpus/imports/`
-//!   (never `corpus/responses/`).
-//! - **Write:** explicit `POST /rest/api/2/issue/{key}/comment` with pandoc
-//!   `jira` wiki body — human-gated, not bulk library sync.
+//! Endpoint map (official Cloud + Server/DC docs):
 //!
-//! Cloud Free API tokens and Server/DC PATs both work via the same env auth.
+//! | Op | Endpoint | Notes |
+//! |----|----------|-------|
+//! | Probe | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud Free email+API token or Server PAT |
+//! | Search | `GET /rest/api/2/search?jql=&fields=summary` | Free JQL; Server also allows POST search |
+//! | Comments GET | `GET /rest/api/2/issue/{key}/comment` | Wiki string **or** Cloud ADF body |
+//! | Comment POST | Server: `POST /rest/api/2/.../comment` wiki · Cloud: `POST /rest/api/3/.../comment` ADF | No paid formatters |
+//!
+//! Import writes drafts under `corpus/imports/` only. Write is explicit one-shot
+//! comment post (review-before-migrate), not bulk library sync.
 
 use crate::convert::convert_jira_to_markdown;
 use anyhow::{bail, Context, Result};
@@ -116,7 +120,8 @@ struct CommentsResponse {
 #[derive(Debug, Deserialize)]
 struct RawComment {
     author: RawUser,
-    body: String,
+    /// Cloud free REST may return ADF objects; Server/DC wiki is a string.
+    body: serde_json::Value,
     created: String,
 }
 
@@ -134,6 +139,122 @@ pub struct IssueComment {
     pub body_wiki: String,
 }
 
+/// Flatten free-platform comment bodies: wiki strings stay as-is; Cloud ADF
+/// (Atlassian Document Format) is reduced to plain text without Marketplace apps.
+pub fn comment_body_to_text(body: &serde_json::Value) -> String {
+    match body {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Object(_) | serde_json::Value::Array(_) => adf_to_plain_text(body),
+        other => other.to_string(),
+    }
+}
+
+fn adf_to_plain_text(node: &serde_json::Value) -> String {
+    let mut out = String::new();
+    adf_walk(node, &mut out);
+    out.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string()
+}
+
+fn adf_walk(node: &serde_json::Value, out: &mut String) {
+    match node {
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::String(text)) = map.get("text") {
+                if !out.is_empty() && !out.ends_with(' ') && !out.ends_with('\n') {
+                    out.push(' ');
+                }
+                out.push_str(text);
+            }
+            if let Some(children) = map.get("content").and_then(|c| c.as_array()) {
+                for child in children {
+                    adf_walk(child, out);
+                }
+                // paragraph/heading breaks
+                if matches!(map.get("type").and_then(|t| t.as_str()), Some("paragraph" | "heading")) {
+                    out.push('\n');
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                adf_walk(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Build minimal free ADF document from plain/wiki text (Cloud comment write path).
+///
+/// Official Cloud v3 comments expect Atlassian Document Format bodies
+/// (developer.atlassian.com Cloud platform REST). This does not use paid apps.
+pub fn plain_text_to_adf(text: &str) -> serde_json::Value {
+    let paragraphs: Vec<serde_json::Value> = text
+        .split("\n")
+        .map(|line| line.trim_end())
+        .filter(|line| !line.is_empty() || text.contains('\n'))
+        .map(|line| {
+            serde_json::json!({
+                "type": "paragraph",
+                "content": if line.is_empty() {
+                    Vec::<serde_json::Value>::new()
+                } else {
+                    vec![serde_json::json!({"type": "text", "text": line})]
+                }
+            })
+        })
+        .collect();
+    let content = if paragraphs.is_empty() {
+        vec![serde_json::json!({
+            "type": "paragraph",
+            "content": [{"type": "text", "text": text}]
+        })]
+    } else {
+        paragraphs
+    };
+    serde_json::json!({
+        "type": "doc",
+        "version": 1,
+        "content": content
+    })
+}
+
+/// How to encode free write comment bodies for platform REST.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CommentBodyFormat {
+    /// Server/Data Center wiki string: `{"body":"h1. ..."}` on `/rest/api/2/...`.
+    Wiki,
+    /// Cloud Free-compatible ADF on `/rest/api/3/...` (no Marketplace formatter).
+    Adf,
+    /// `*.atlassian.net` → Adf, otherwise Wiki.
+    #[default]
+    Auto,
+}
+
+impl CommentBodyFormat {
+    pub fn resolve(self, base_url: &str) -> CommentBodyFormat {
+        match self {
+            CommentBodyFormat::Auto => {
+                if is_cloud_host(base_url) {
+                    CommentBodyFormat::Adf
+                } else {
+                    CommentBodyFormat::Wiki
+                }
+            }
+            other => other,
+        }
+    }
+}
+
+/// True when the base URL looks like Jira Cloud Free/Standard host.
+pub fn is_cloud_host(base_url: &str) -> bool {
+    let lower = base_url.to_ascii_lowercase();
+    lower.contains("atlassian.net") || lower.contains("jira.com")
+}
+
 fn parse_comments_response(json: &str) -> Result<Vec<IssueComment>> {
     let parsed: CommentsResponse =
         serde_json::from_str(json).context("parse Jira comments response")?;
@@ -143,7 +264,7 @@ fn parse_comments_response(json: &str) -> Result<Vec<IssueComment>> {
         .map(|c| IssueComment {
             author: c.author.display_name,
             created: c.created,
-            body_wiki: c.body,
+            body_wiki: comment_body_to_text(&c.body),
         })
         .collect())
 }
@@ -469,29 +590,61 @@ fn parse_comment_create_response(json: &str) -> Result<(String, Option<String>)>
     Ok((id, parsed.body))
 }
 
+/// Free platform comment endpoints (official Cloud/Server REST — no Marketplace).
+///
+/// | Host | Format | Endpoint |
+/// |------|--------|----------|
+/// | Server/DC | wiki string | `POST /rest/api/2/issue/{key}/comment` `{"body":"wiki"}` |
+/// | Cloud Free | ADF | `POST /rest/api/3/issue/{key}/comment` ADF `body` object |
+///
+/// See developer.atlassian.com Cloud platform REST (issue comments) and Server
+/// REST API examples. Auth: Cloud email+API token Basic, or Server PAT header.
+fn comment_post_url(base_url: &str, issue_key: &str, format: CommentBodyFormat) -> String {
+    let base = base_url.trim_end_matches('/');
+    let api = match format.resolve(base_url) {
+        CommentBodyFormat::Adf => "3",
+        _ => "2",
+    };
+    format!("{base}/rest/api/{api}/issue/{issue_key}/comment")
+}
+
+fn comment_post_payload(body_wiki: &str, format: CommentBodyFormat, base_url: &str) -> serde_json::Value {
+    match format.resolve(base_url) {
+        CommentBodyFormat::Adf => serde_json::json!({ "body": plain_text_to_adf(body_wiki) }),
+        _ => serde_json::json!({ "body": body_wiki }),
+    }
+}
+
 fn build_comment_post_request(
     client: &reqwest::blocking::Client,
     cfg: &JiraConfig,
     issue_key: &str,
     body_wiki: &str,
+    format: CommentBodyFormat,
 ) -> reqwest::Result<reqwest::blocking::Request> {
-    let url = format!(
-        "{}/rest/api/2/issue/{issue_key}/comment",
-        cfg.base_url.trim_end_matches('/')
-    );
-    let payload = serde_json::json!({ "body": body_wiki });
+    let url = comment_post_url(&cfg.base_url, issue_key, format);
+    let payload = comment_post_payload(body_wiki, format, &cfg.base_url);
     apply_auth(client.post(&url).json(&payload), &cfg.auth).build()
 }
 
-/// POST a wiki-markup comment on an issue via free platform REST.
+/// POST a comment via free platform REST (wiki on Server/DC, ADF on Cloud Free).
 ///
-/// Body must already be Jira wiki (e.g. from [`crate::convert::convert_markdown_to_jira`]).
-/// This is the only free write surface canonic ships — not a canned-response
-/// admin product API and not a Marketplace extension.
+/// `body_wiki` is pandoc jira markup (or plain text). On Cloud Free, it is wrapped
+/// in minimal ADF. No Marketplace apps.
 pub fn post_issue_comment(
     cfg: &JiraConfig,
     issue_key: &str,
     body_wiki: &str,
+) -> Result<PostedComment> {
+    post_issue_comment_with_format(cfg, issue_key, body_wiki, CommentBodyFormat::Auto)
+}
+
+/// Like [`post_issue_comment`] with an explicit body format.
+pub fn post_issue_comment_with_format(
+    cfg: &JiraConfig,
+    issue_key: &str,
+    body_wiki: &str,
+    format: CommentBodyFormat,
 ) -> Result<PostedComment> {
     if issue_key.trim().is_empty() {
         bail!("issue key is empty");
@@ -499,8 +652,9 @@ pub fn post_issue_comment(
     if body_wiki.trim().is_empty() {
         bail!("comment body is empty");
     }
+    let resolved = format.resolve(&cfg.base_url);
     let client = reqwest::blocking::Client::new();
-    let req = build_comment_post_request(&client, cfg, issue_key, body_wiki)
+    let req = build_comment_post_request(&client, cfg, issue_key, body_wiki, resolved)
         .with_context(|| format!("build comment POST for {issue_key}"))?;
     let resp = client
         .execute(req)
@@ -509,7 +663,7 @@ pub fn post_issue_comment(
         let status = resp.status();
         let detail = resp.text().unwrap_or_default();
         bail!(
-            "posting comment on {issue_key} failed: HTTP {status}{}",
+            "posting comment on {issue_key} failed: HTTP {status} (format={resolved:?}){}",
             if detail.is_empty() {
                 String::new()
             } else {
@@ -536,6 +690,23 @@ pub fn post_comment_from_markdown(
     markdown_path: &Path,
     dry_run: bool,
 ) -> Result<PostedComment> {
+    post_comment_from_markdown_with_format(
+        cfg,
+        issue_key,
+        markdown_path,
+        dry_run,
+        CommentBodyFormat::Auto,
+    )
+}
+
+/// Like [`post_comment_from_markdown`] with an explicit free-tier body format.
+pub fn post_comment_from_markdown_with_format(
+    cfg: &JiraConfig,
+    issue_key: &str,
+    markdown_path: &Path,
+    dry_run: bool,
+    format: CommentBodyFormat,
+) -> Result<PostedComment> {
     let wiki = crate::convert::convert_path_to_jira(markdown_path)
         .with_context(|| format!("convert {} to jira markup", markdown_path.display()))?;
     if dry_run {
@@ -545,7 +716,7 @@ pub fn post_comment_from_markdown(
             body_wiki: wiki,
         });
     }
-    post_issue_comment(cfg, issue_key, &wiki)
+    post_issue_comment_with_format(cfg, issue_key, &wiki, format)
 }
 
 
@@ -751,7 +922,7 @@ mod tests {
             JiraAuth::Header("Bearer pat".into()),
         );
         let wiki = "h1. Smoke\n\nBody *bold*.";
-        let req = build_comment_post_request(&client, &cfg, "HSP-101", wiki).unwrap();
+        let req = build_comment_post_request(&client, &cfg, "HSP-101", wiki, CommentBodyFormat::Wiki).unwrap();
         assert_eq!(req.method(), reqwest::Method::POST);
         assert_eq!(req.url().path(), "/rest/api/2/issue/HSP-101/comment");
         let body = String::from_utf8_lossy(req.body().unwrap().as_bytes().unwrap());
@@ -806,5 +977,69 @@ mod tests {
             posted.body_wiki
         );
         let _ = std::fs::remove_file(&md);
+    }
+
+    #[test]
+    fn cloud_host_detection() {
+        assert!(is_cloud_host("https://acme.atlassian.net"));
+        assert!(!is_cloud_host("https://jira.example.org"));
+        assert_eq!(
+            CommentBodyFormat::Auto.resolve("https://x.atlassian.net"),
+            CommentBodyFormat::Adf
+        );
+        assert_eq!(
+            CommentBodyFormat::Auto.resolve("http://localhost:8080"),
+            CommentBodyFormat::Wiki
+        );
+    }
+
+    #[test]
+    fn plain_text_to_adf_is_minimal_doc() {
+        let adf = plain_text_to_adf("line one\n\nline two");
+        assert_eq!(adf["type"], "doc");
+        assert_eq!(adf["version"], 1);
+        assert!(adf["content"].as_array().unwrap().len() >= 1);
+        let s = adf.to_string();
+        assert!(s.contains("line one"));
+        assert!(s.contains("line two"));
+    }
+
+    #[test]
+    fn comment_body_to_text_reads_wiki_string_and_adf() {
+        let wiki = serde_json::json!("h1. Hello");
+        assert_eq!(comment_body_to_text(&wiki), "h1. Hello");
+        let adf = serde_json::json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "Hello ADF"}]
+            }]
+        });
+        assert!(comment_body_to_text(&adf).contains("Hello ADF"));
+    }
+
+    #[test]
+    fn cloud_comment_post_uses_api3_and_adf() {
+        let client = reqwest::blocking::Client::new();
+        let cfg = JiraConfig::new(
+            "https://acme.atlassian.net",
+            JiraAuth::Basic {
+                user: "a@b.c".into(),
+                token: "t".into(),
+            },
+        );
+        let req = build_comment_post_request(
+            &client,
+            &cfg,
+            "HSP-1",
+            "hello *world*",
+            CommentBodyFormat::Auto,
+        )
+        .unwrap();
+        assert_eq!(req.url().path(), "/rest/api/3/issue/HSP-1/comment");
+        let body = String::from_utf8_lossy(req.body().unwrap().as_bytes().unwrap());
+        assert!(body.contains("\"type\":\"doc\"") || body.contains("\"doc\""), "{body}");
+        assert!(body.contains("hello") || body.contains("world"), "{body}");
     }
 }

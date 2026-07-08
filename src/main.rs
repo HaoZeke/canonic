@@ -6,7 +6,10 @@ use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available}
 use canonic::corpus::{default_corpus_dir, walk_responses};
 use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
 use canonic::index::{default_index_dir, find_duplicates, reindex, search};
-use canonic::jira_import::{default_import_dir, format_probe, import_jira, post_comment_from_markdown, probe_jira, JiraConfig};
+use canonic::jira_import::{
+    default_import_dir, format_probe, import_jira, post_comment_from_markdown_with_format,
+    probe_jira, CommentBodyFormat, JiraConfig,
+};
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -113,7 +116,32 @@ enum Commands {
         /// Print converted wiki markup without POSTing
         #[arg(long)]
         dry_run: bool,
+        /// Comment body encoding for free platform REST: auto (Cloud→ADF, Server→wiki), wiki, adf
+        #[arg(long, value_enum, default_value_t = CommentBodyCli::Auto)]
+        body_format: CommentBodyCli,
     },
+}
+
+/// CLI mirror of free-tier [`CommentBodyFormat`] (Cloud Free ADF vs Server wiki).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum, Default)]
+enum CommentBodyCli {
+    /// `*.atlassian.net` → ADF on `/rest/api/3`, else wiki on `/rest/api/2`
+    #[default]
+    Auto,
+    /// Server/DC wiki string body on API v2
+    Wiki,
+    /// Cloud Free ADF body on API v3 (no Marketplace apps)
+    Adf,
+}
+
+impl From<CommentBodyCli> for CommentBodyFormat {
+    fn from(v: CommentBodyCli) -> Self {
+        match v {
+            CommentBodyCli::Auto => CommentBodyFormat::Auto,
+            CommentBodyCli::Wiki => CommentBodyFormat::Wiki,
+            CommentBodyCli::Adf => CommentBodyFormat::Adf,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -338,12 +366,17 @@ fn run() -> Result<ExitCode> {
             issue,
             path,
             dry_run,
+            body_format,
         } => {
             let cfg = JiraConfig::from_env()?;
-            let posted = post_comment_from_markdown(&cfg, &issue, &path, dry_run)?;
+            let format = CommentBodyFormat::from(body_format);
+            let posted = post_comment_from_markdown_with_format(
+                &cfg, &issue, &path, dry_run, format,
+            )?;
+            let resolved = format.resolve(&cfg.base_url);
             if dry_run {
                 println!(
-                    "would post comment on {issue} ({} bytes wiki from {}):",
+                    "would post comment on {issue} (format={resolved:?}, {} bytes from {}):",
                     posted.body_wiki.len(),
                     path.display()
                 );
@@ -353,7 +386,7 @@ fn run() -> Result<ExitCode> {
                 }
             } else {
                 println!(
-                    "posted comment {} on {} ({} bytes wiki from {})",
+                    "posted comment {} on {} (format={resolved:?}, {} bytes from {})",
                     posted.comment_id,
                     posted.issue_key,
                     posted.body_wiki.len(),

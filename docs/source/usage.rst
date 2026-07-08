@@ -142,10 +142,27 @@ targets without fetching comments.
 
 **Comment write (explicit)**
 
-``jira-comment --issue KEY PATH.md`` converts the markdown with pandoc's free
-``jira`` writer and ``POST``s ``/rest/api/2/issue/{key}/comment``. Use
-``--dry-run`` to print the wiki body without POSTing. This is **not** unattended
-bulk library sync — one file, one issue, human-gated.
+``jira-comment --issue KEY PATH.md`` converts markdown with pandoc's free
+``jira`` writer, then posts via platform REST:
+
+- Server/DC: ``POST /rest/api/2/issue/{key}/comment`` with wiki string body
+- Cloud Free (``*.atlassian.net``): ``POST /rest/api/3/issue/{key}/comment`` with
+  minimal **ADF** (Atlassian Document Format) — required by Cloud v3, no paid apps
+
+``--body-format auto|wiki|adf`` overrides host detection. ``--dry-run`` prints the
+converted wiki without POSTing. One file, one issue, human-gated — not bulk sync.
+
+**Official free map (platform only)**
+
++------------------+----------------------------------------------+------------------+
+| Command          | Endpoint                                     | Body             |
++==================+==============================================+==================+
+| ``jira-probe``   | ``GET /rest/api/2/myself``                   | —                |
++------------------+----------------------------------------------+------------------+
+| ``import-jira``  | ``GET /rest/api/2/search`` + comments        | wiki or ADF read |
++------------------+----------------------------------------------+------------------+
+| ``jira-comment`` | ``POST …/comment`` (v2 wiki / v3 ADF)        | pandoc jira text |
++------------------+----------------------------------------------+------------------+
 
 **Authentication (environment):**
 
