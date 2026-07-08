@@ -2,7 +2,7 @@
 name = "canonic"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.85"
 description = "Versioned Jira Jira canned-response corpus: markdown source of truth, pandoc jira convert, quality checks, Tantivy search/dedupe"
 license = "MIT"
 authors = ["Rohit Goswami <rgoswami@ieee.org>"]

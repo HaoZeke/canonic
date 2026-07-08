@@ -21,7 +21,7 @@ The script creates `.venv-docs` if needed, installs `docs/requirements.txt` (Sph
 
 ## Install
 
-Primary path for a public clone (Rust 1.75+):
+Primary path for a public clone (Rust 1.85+; matches locked clap / harper-core):
 
 ```bash
 cargo install --git https://github.com/HaoZeke/canonic --locked
@@ -38,7 +38,7 @@ cargo build --release
 
 | Tool | Role |
 |------|------|
-| [Rust](https://rustup.rs/) (1.75+) | Build / install the CLI |
+| [Rust](https://rustup.rs/) (1.85+) | Build / install the CLI |
 | [pandoc](https://pandoc.org/) | `convert` — markdown → `jira` writer |
 | [Vale](https://vale.sh/) | optional style lint |
 | Harper | **in-process `harper-core`** (linked); optional CLI on `PATH` |

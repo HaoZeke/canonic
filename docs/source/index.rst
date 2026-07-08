@@ -118,7 +118,7 @@ Install
    # or from a checkout:
    cargo build --release
 
-**Requirements:** Rust 1.75+, `pandoc <https://pandoc.org/>`_ for ``convert``,
+**Requirements:** Rust 1.85+, `pandoc <https://pandoc.org/>`_ for ``convert``,
 optional `Vale <https://vale.sh/>`_ for style lint (Harper is linked in-process).
 Run ``canonic doctor`` to see what the environment can already do.
 
