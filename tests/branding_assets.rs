@@ -108,3 +108,23 @@ fn landing_page_has_product_ux_structure() {
     let usage = fs::read_to_string(repo_root().join("docs/source/usage.rst")).unwrap();
     assert!(usage.contains("cn-page-intro") && usage.contains("cn-cmd-list"));
 }
+
+#[test]
+fn architecture_and_api_pages_ship_visuals_and_rustdoc_link() {
+    let arch = fs::read_to_string(repo_root().join("docs/source/architecture.rst")).unwrap();
+    assert!(arch.contains("architecture.svg"), "architecture page needs diagram");
+    assert!(arch.contains("modules.svg"), "architecture page needs module map");
+    let api = fs::read_to_string(repo_root().join("docs/source/api.rst")).unwrap();
+    assert!(api.contains("rustdoc/canonic/index.html"), "API page must link shipped rustdoc");
+    assert!(api.contains("cn-mod-grid") || api.contains("Module overview"));
+    let arch_svg = static_dir().join("architecture.svg");
+    let mod_svg = static_dir().join("modules.svg");
+    assert!(arch_svg.is_file() && fs::metadata(&arch_svg).unwrap().len() > 400);
+    assert!(mod_svg.is_file() && fs::metadata(&mod_svg).unwrap().len() > 400);
+    let build = fs::read_to_string(repo_root().join("docs/build.sh")).unwrap();
+    assert!(build.contains("cargo doc"), "docs build must generate rustdoc");
+    assert!(build.contains("rustdoc"), "docs build copies rustdoc into site output");
+    let conf = fs::read_to_string(repo_root().join("docs/source/conf.py")).unwrap();
+    assert!(conf.contains("dark_code"), "Shibuya dark_code for code UX");
+    assert!(conf.contains("architecture") && conf.contains("api"));
+}

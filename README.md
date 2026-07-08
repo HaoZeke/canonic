@@ -17,7 +17,7 @@ Sphinx + [Shibuya](https://shibuya.lepture.com/) themed HTML lives under `docs/`
 python3 -m http.server -d docs/build 8000
 ```
 
-The script creates `.venv-docs` if needed, installs `docs/requirements.txt` (Sphinx, Shibuya, sphinx-design, sphinx-copybutton), and runs `sphinx-build`. Branding assets are in `docs/source/_static/` (`logo.svg`, `logo-dark.svg`, `favicon.svg`, `mark.svg`).
+The script creates `.venv-docs` if needed, installs `docs/requirements.txt` (Sphinx, Shibuya, sphinx-design, sphinx-copybutton), runs `sphinx-build`, then `cargo doc` and copies rustdoc into `docs/build/rustdoc/` (open `docs/build/rustdoc/canonic/index.html` or use the **Rust API** nav link). Branding assets live in `docs/source/_static/` (logos, favicon, mark, architecture/module diagrams). Set `CANONIC_SKIP_RUSTDOC=1` to skip the rustdoc step.
 
 ## Install
 

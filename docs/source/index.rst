@@ -67,6 +67,13 @@ Workflow at a glance
      </li>
    </ol>
 
+.. raw:: html
+
+   <div class="cn-figure">
+     <img src="_static/architecture.svg" width="840" height="280" alt="canonic architecture pipeline" />
+     <p class="cn-figure-caption">Full pipeline diagram — details in <a href="architecture.html">Architecture</a>.</p>
+   </div>
+
 What you need → what you run
 ----------------------------
 
@@ -157,6 +164,18 @@ Documentation map
 
       Why Tantivy, markdown-as-source, and the review-before-migrate rule.
 
+   .. grid-item-card:: Architecture
+      :link: architecture
+      :link-type: doc
+
+      Pipeline diagram, layers, and library module map.
+
+   .. grid-item-card:: Rust API
+      :link: api
+      :link-type: doc
+
+      Module overview and link to cargo-generated rustdoc.
+
 .. toctree::
    :maxdepth: 1
    :caption: Guides
@@ -164,6 +183,8 @@ Documentation map
 
    usage
    design
+   architecture
+   api
 
 Source & license
 ================

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 280" role="img" aria-label="canonic architecture">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0D9488"/><stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <linearGradient id="soft" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#F0FDFA"/><stop offset="1" stop-color="#CCFBF1"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0F766E"/>
+    </marker>
+  </defs>
+  <rect width="840" height="280" rx="18" fill="#F8FAFC"/>
+  <rect x="1" y="1" width="838" height="278" rx="18" fill="none" stroke="#99F6E4" stroke-width="2"/>
+  <!-- row of stages -->
+  <g font-family="ui-sans-serif, system-ui, sans-serif">
+    <!-- Markdown corpus -->
+    <rect x="32" y="56" width="150" height="120" rx="14" fill="url(#soft)" stroke="#5EEAD4"/>
+    <rect x="48" y="72" width="48" height="56" rx="6" fill="url(#tile)"/>
+    <path d="M58 88h28M58 98h22M58 108h26" stroke="#ECFDF5" stroke-width="2.2" stroke-linecap="round"/>
+    <text x="107" y="100" font-size="13" font-weight="700" fill="#115E59">Markdown</text>
+    <text x="107" y="118" font-size="11" fill="#134E4A">corpus/responses</text>
+    <text x="107" y="134" font-size="11" fill="#134E4A">resp-*.md</text>
+
+    <path d="M190 116 H230" stroke="#0F766E" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <!-- check / lint -->
+    <rect x="238" y="56" width="150" height="120" rx="14" fill="url(#soft)" stroke="#5EEAD4"/>
+    <circle cx="278" cy="100" r="22" fill="url(#tile)"/>
+    <path d="M268 100l7 7 14-16" fill="none" stroke="#ECFDF5" stroke-width="2.8" stroke-linecap="round"/>
+    <text x="310" y="96" font-size="13" font-weight="700" fill="#115E59">Quality</text>
+    <text x="310" y="114" font-size="11" fill="#134E4A">check · lint</text>
+    <text x="310" y="132" font-size="11" fill="#134E4A">Vale / Harper</text>
+
+    <path d="M396 116 H436" stroke="#0F766E" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <!-- Tantivy -->
+    <rect x="444" y="56" width="150" height="120" rx="14" fill="url(#soft)" stroke="#5EEAD4"/>
+    <rect x="460" y="78" width="40" height="40" rx="8" fill="url(#tile)"/>
+    <path d="M470 92h20M470 100h14M470 108h18" stroke="#ECFDF5" stroke-width="2" stroke-linecap="round"/>
+    <text x="512" y="96" font-size="13" font-weight="700" fill="#115E59">Tantivy</text>
+    <text x="512" y="114" font-size="11" fill="#134E4A">search · dedupe</text>
+    <text x="512" y="132" font-size="11" fill="#134E4A">BM25 + Jaccard</text>
+
+    <path d="M602 116 H642" stroke="#0F766E" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <!-- Jira surface -->
+    <rect x="650" y="56" width="158" height="120" rx="14" fill="url(#soft)" stroke="#5EEAD4"/>
+    <rect x="668" y="78" width="40" height="40" rx="8" fill="url(#tile)"/>
+    <path d="M678 92h20M678 100h16" stroke="#ECFDF5" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="696" cy="112" r="5" fill="#5EEAD4"/>
+    <text x="720" y="96" font-size="13" font-weight="700" fill="#115E59">Jira</text>
+    <text x="720" y="114" font-size="11" fill="#134E4A">convert · import</text>
+    <text x="720" y="132" font-size="11" fill="#134E4A">human publish</text>
+  </g>
+  <text x="42" y="220" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="650" fill="#0F766E">Source of truth stays in git. Jira is a publication surface — never auto-written.</text>
+  <text x="42" y="244" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#64748B">canonic CLI · pandoc jira writer · Tantivy index under .canonic-index/</text>
+</svg>

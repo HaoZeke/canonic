@@ -1,4 +1,36 @@
-//! Canonic: versioned markdown canned responses for Jira, with convert/lint/search/dedupe.
+//! # canonic
+//!
+//! Versioned markdown canned-response corpus for the cluster / Support Jira work.
+//!
+//! The CLI is a thin front end. Library consumers can call the same engines:
+//!
+//! | Module | Role |
+//! |--------|------|
+//! | [`corpus`] | Walk and load `resp-*.md` responses |
+//! | [`check`] | Quality gate (prefix, sop, closings) |
+//! | [`convert`] | Pandoc markdown ↔ Jira wiki markup |
+//! | [`index`] | Tantivy BM25 search and near-duplicate pairs |
+//! | [`lint`] | Vale CLI + in-process Harper |
+//! | [`doctor`] | Tooling probes |
+//! | [`jira_import`] | REST v2 read path → review drafts |
+//!
+//! ## Example
+//!
+//! ```no_run
+//! use canonic::{default_corpus_dir, walk_responses, check_responses};
+//!
+//! let dir = default_corpus_dir();
+//! let responses = walk_responses(&dir).expect("read corpus");
+//! let report = check_responses(&responses);
+//! assert!(report.ok() || !report.findings.is_empty());
+//! ```
+//!
+//! Markdown under `corpus/responses/` remains the source of truth. Jira is a
+//! publication surface: convert for paste-in, import only as drafts under
+//! `corpus/imports/`.
+
+#![doc(html_logo_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/mark.svg")]
+#![doc(html_favicon_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/favicon.svg")]
 
 pub mod check;
 pub mod convert;

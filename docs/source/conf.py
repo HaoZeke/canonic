@@ -19,7 +19,7 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
-exclude_patterns: list[str] = []
+exclude_patterns: list[str] = ["crates", "rustdoc"]
 
 html_theme = "shibuya"
 html_static_path = ["_static"]
@@ -27,6 +27,8 @@ html_favicon = "_static/favicon.svg"
 html_logo = "_static/logo.svg"
 html_title = "canonic"
 html_css_files = ["custom.css"]
+# cargo doc output is copied next to Sphinx HTML by docs/build.sh
+html_extra_path: list[str] = []
 
 html_context = {
     "source_type": "github",
@@ -41,11 +43,22 @@ html_theme_options = {
     "light_logo": "_static/logo.svg",
     "dark_logo": "_static/logo-dark.svg",
     "github_url": "https://github.com/HaoZeke/canonic",
+    "dark_code": True,
+    "globaltoc_expand_depth": 1,
     "nav_links": [
         {"title": "Usage", "url": "usage"},
         {"title": "Design", "url": "design"},
+        {"title": "Architecture", "url": "architecture"},
+        {"title": "Rust API", "url": "api"},
     ],
-    "globaltoc_expand_depth": 1,
+}
+
+html_sidebars = {
+    "**": [
+        "sidebars/localtoc.html",
+        "sidebars/repo-stats.html",
+        "sidebars/edit-this-page.html",
+    ],
 }
 
 html_meta = {
@@ -55,6 +68,5 @@ html_meta = {
     ),
 }
 
-# Copybutton: skip prompts in console blocks
 copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
 copybutton_prompt_is_regexp = True
