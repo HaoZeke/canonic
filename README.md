@@ -131,6 +131,14 @@ JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIR
 
 `import-jira <jql>` searches Jira via its representational state transfer (REST) API v2 (`/rest/api/2/search`, then `/rest/api/2/issue/{key}/comment` per result), converts each comment's wiki markup back to markdown with pandoc, and writes one draft file per issue under `corpus/imports/` — never directly into `corpus/responses/`, since a human still has to pick the real answer, assign a clean `id`, and set `sop`. `--dry-run` lists which issues canonic would import, without fetching comments.
 
+Against a disposable Jira REST v2 fixture (podman/docker; seeds meeting-shaped messy canned comments under `labels = canned-response`):
+
+```bash
+./scripts/jira-fixture/run-import-smoke.sh
+```
+
+That builds a tiny container, runs dry-run + Basic + Bearer import, checks pandoc convert, then removes the container (set `CANONIC_JIRA_SMOKE_TRASH=0` to keep the workdir for inspection).
+
 Authentication reads from the environment:
 
 - `JIRA_BASE_URL` — required, e.g. `https://your-instance.atlassian.net`.
