@@ -206,16 +206,22 @@ JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
 # Import existing issue comments as review drafts (never auto-writes corpus/responses/)
 canonic import-jira "project = HSP AND labels = canned-response" --dry-run
 canonic import-jira "project = HSP AND labels = canned-response"
+# edit corpus/imports/resp-….md, then:
+canonic promote corpus/imports/resp-….md
+canonic check
 
 # Explicit write: pandoc jira → free REST comment (Cloud ADF / Server wiki)
+canonic convert corpus/responses/resp-demo-shared-quota.md
 canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md --dry-run
 canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md
 canonic jira-comment --issue HSP-101 PATH.md --body-format wiki   # force Server/DC
 canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud ADF
+# Server/DC PAT alternative to email+token:
+# export JIRA_AUTH_HEADER="Bearer <personal-access-token>"
 ```
 
 - Import reads wiki **or** Cloud ADF comment bodies (ADF flattened to text, then pandoc `jira`→markdown when applicable).
-- Write is **one file → one issue comment**, human-gated — not bulk library sync.
+- Write is **one file → one issue comment**, human-gated — **not bulk library sync**.
 - `canonic doctor` reports free Jira status only when `JIRA_BASE_URL` is set (probe failure does not fail the critical path).
 
 Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
