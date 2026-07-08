@@ -26,6 +26,7 @@ html_static_path = ["_static"]
 html_favicon = "_static/favicon.svg"
 html_logo = "_static/logo.svg"
 html_title = "canonic"
+html_baseurl = "https://canonic.rgoswami.me/"
 html_css_files = ["custom.css"]
 # cargo doc output is copied next to Sphinx HTML by docs/build.sh
 html_extra_path: list[str] = []

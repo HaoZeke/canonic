@@ -1,5 +1,8 @@
 # canonic
 
+[![Documentation](https://img.shields.io/badge/docs-canonic.rgoswami.me-blue)](https://canonic.rgoswami.me)
+[![Release](https://img.shields.io/github/v/release/HaoZeke/canonic)](https://github.com/HaoZeke/canonic/releases)
+
 <p align="center">
   <img src="docs/source/_static/logo.svg" width="280" alt="canonic logo" />
 </p>
@@ -7,6 +10,8 @@
 **canonic** is a versioned **Jira canned-response** corpus tool: markdown under a shared **`resp-`** id prefix is the source of truth. Convert with **pandoc**, enforce **quality checks**, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25). The `resp-` prefix is a configurable naming convention, not a product brand.
 
 ## Docs site (Shibuya)
+
+Live site: **https://canonic.rgoswami.me** (Cloudflare Pages + Antics).
 
 Sphinx + [Shibuya](https://shibuya.lepture.com/) themed HTML lives under `docs/`. Build from the repo root:
 
