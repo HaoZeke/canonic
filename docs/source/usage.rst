@@ -210,10 +210,13 @@ Recipes
 
 **New response from scratch**
 
+The filename is ``resp-`` plus a slug of the title (override with ``--id``).
+
 .. code:: shell
 
    canonic new "Project space is not a backup" --tags storage,project-space
-   $EDITOR corpus/responses/resp-demo-shared-quota.md
+   # → corpus/responses/resp-project-space-is-not-a-backup.md
+   $EDITOR corpus/responses/resp-project-space-is-not-a-backup.md
    canonic check
    canonic lint --engine harper
    canonic tui
@@ -257,14 +260,21 @@ Full paste-ready session
 
    canonic doctor
    canonic list
-   canonic new "Example topic" --tags example
+   # shipped demo (no scaffold required):
+   canonic convert corpus/responses/resp-demo-shared-quota.md
    canonic check
    canonic lint --engine harper
-   canonic convert corpus/responses/resp-demo-shared-quota.md
    canonic tui
 
+   # scaffold a new response (slug from title):
+   canonic new "Example topic" --tags example
+   # → corpus/responses/resp-example-topic.md
+   $EDITOR corpus/responses/resp-example-topic.md
+   canonic check
+   canonic convert corpus/responses/resp-example-topic.md
+
    canonic reindex
-   canonic search "project space backup"
+   canonic search "shared quota"
    canonic dedupe --reindex --threshold 1.0
 
    JIRA_BASE_URL=https://your-instance.atlassian.net \

@@ -59,10 +59,11 @@ fn public_rel_paths() -> Vec<&'static str> {
         "docs/source/api.rst",
         "docs/source/conf.py",
         "scripts/mirror-to-gitlab.sh",
+        "scripts/ci/jira-docker-smoke.sh",
         ".github/workflows/ci.yml",
         ".agents/skills/canonic-canned-loop/SKILL.md",
         "flake.nix",
-        "nix/jira-fixture-image.nix",
+        "flake.lock",
     ]
 }
 
@@ -86,6 +87,7 @@ fn collect_extra(root: &Path) -> Vec<PathBuf> {
         "corpus/responses",
         "scripts/jira-fixture",
         "scripts/jira-real",
+        "scripts/ci",
         "tests",
         "styles",
     ] {

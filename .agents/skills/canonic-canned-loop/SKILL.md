@@ -62,7 +62,9 @@ canonic import-jira "project = HSP AND labels = canned-response" --out /tmp/impo
 
 ```bash
 canonic new "Project space is not a backup" --tags storage,project-space
+# → corpus/responses/resp-project-space-is-not-a-backup.md
 canonic new "Queue limits" --id resp-queue-limits --sop none --out corpus/responses
+# → corpus/responses/resp-queue-limits.md
 ```
 
 ### 4. Edit, then quality gate

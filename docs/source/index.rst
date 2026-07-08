@@ -135,15 +135,15 @@ First canned response
 .. raw:: html
 
    <ol class="cn-steps">
-     <li><strong>Create</strong> <code>corpus/responses/resp-demo-shared-quota.md</code> with front matter
-     (<code>id</code>, <code>title</code>, <code>prefix: resp</code>, <code>tags</code>, <code>sop</code>) and a
-     team-generic closing (e.g. <code>Support Team</code>).</li>
+     <li><strong>Scaffold:</strong> <code>canonic new "Example topic"</code>
+     → <code>corpus/responses/resp-example-topic.md</code> (or edit the shipped demo
+     <code>resp-demo-shared-quota.md</code>).</li>
      <li><strong>Validate:</strong> <code>canonic check</code></li>
      <li><strong>Index &amp; search:</strong> <code>canonic reindex</code> then <code>canonic search "example topic"</code></li>
-     <li><strong>Convert</strong> (needs pandoc): <code>canonic convert corpus/responses/resp-demo-shared-quota.md</code></li>
+     <li><strong>Convert</strong> (needs pandoc): <code>canonic convert corpus/responses/resp-example-topic.md</code>
+     (or the shipped <code>resp-demo-shared-quota.md</code> path).</li>
    </ol>
 
-Delete the example once you commit a real response under its own id.
 Full command reference: :doc:`usage`.
 
 Documentation map

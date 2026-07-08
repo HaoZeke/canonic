@@ -47,11 +47,11 @@ cargo build --release
 
 Published answers live under `corpus/responses/` (a seeded sample ships so `list` / `check` / convert work on a clean clone). Prefer the scaffold CLI over hand-copying front matter.
 
-1. Scaffold a check-clean draft:
+1. Scaffold a check-clean draft (id = `resp-` + slug of the title):
 
    ```bash
    canonic new "Example topic" --tags example
-   # → corpus/responses/resp-demo-shared-quota.md
+   # → corpus/responses/resp-example-topic.md
    ```
 
 2. Edit the body, then validate:
@@ -71,9 +71,12 @@ Published answers live under `corpus/responses/` (a seeded sample ships so `list
 4. Convert to Jira wiki markup (requires pandoc), or post explicitly:
 
    ```bash
-   canonic convert corpus/responses/resp-demo-shared-quota.md
-   canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md --dry-run
+   canonic convert corpus/responses/resp-example-topic.md
+   canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
    ```
+
+   A shipped demo also lives at `corpus/responses/resp-demo-shared-quota.md` for
+   `list` / CI without scaffolding first.
 
 **Import → review → promote:** pull existing Jira comments as drafts (never auto-published), edit, then promote:
 
@@ -128,15 +131,17 @@ sop: none
 
 ```bash
 canonic doctor
-canonic list
+canonic list                           # includes shipped resp-demo-*.md samples
 canonic tui                            # interactive ratatui browser
-canonic new "Project space is not a backup" --tags storage
+canonic convert corpus/responses/resp-demo-shared-quota.md
 canonic check                          # quality gate (exit 1 on findings)
 canonic lint --engine harper           # in-process harper-core (CI uses this)
-canonic convert corpus/responses/resp-demo-shared-quota.md
+
+canonic new "Example topic" --tags example
+# → corpus/responses/resp-example-topic.md  (edit, then check again)
 
 canonic reindex
-canonic search "project space backup"
+canonic search "shared quota"
 canonic dedupe --reindex --threshold 1.0
 canonic dedupe --threshold 0.5 --json
 
