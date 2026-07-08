@@ -48,14 +48,16 @@ Command map
            <li>canonic convert corpus/responses/resp-….md<span class="cn-cmd-hint">needs pandoc jira writer</span></li>
          </ul>
 
-   .. grid-item-card:: Jira read path
+   .. grid-item-card:: Free Jira REST
       :class-card: sd-border-0
 
       .. raw:: html
 
          <ul class="cn-cmd-list">
-           <li>canonic import-jira "project = HSP …" --dry-run</li>
-           <li>canonic import-jira "JQL"<span class="cn-cmd-hint">writes corpus/imports/ drafts</span></li>
+           <li>canonic jira-probe<span class="cn-cmd-hint">myself · free platform only</span></li>
+           <li>canonic import-jira "JQL" --dry-run</li>
+           <li>canonic import-jira "JQL"<span class="cn-cmd-hint">drafts under corpus/imports/</span></li>
+           <li>canonic jira-comment --issue KEY PATH.md<span class="cn-cmd-hint">explicit POST comment</span></li>
          </ul>
 
 Full paste-ready session
@@ -76,7 +78,9 @@ Full paste-ready session
 
    JIRA_BASE_URL=https://your-instance.atlassian.net \
    JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
-     canonic import-jira "project = HSP AND labels = canned-response" --dry-run
+     canonic jira-probe
+   canonic import-jira "project = HSP AND labels = canned-response" --dry-run
+   canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
 
 Corpus layout
 -------------
@@ -117,25 +121,40 @@ similarity for a second opinion.
    before a Jira migration). Drop the threshold and add ``--json`` when you
    want a wider review list.
 
-Jira import (read path)
------------------------
+Free Jira REST (no paid Marketplace apps)
+-----------------------------------------
 
-``import-jira <jql>`` searches Jira via REST API v2
-(``/rest/api/2/search``, then comments per issue), converts each comment's wiki
-markup back to markdown with pandoc, and writes **one draft file per issue**
-under ``corpus/imports/`` — never directly into ``corpus/responses/``. A human
-still picks the real answer, assigns a clean ``id``, and sets ``sop``.
+canonic uses only **native platform REST** (Cloud Free API tokens or Server/DC
+PAT). No Marketplace extensions, ScriptRunner, or paid Service Desk canned-response
+admin APIs.
 
-``--dry-run`` lists which issues would be imported without fetching comments.
+**Probe**
+
+``canonic jira-probe`` calls ``GET /rest/api/2/myself`` (and serverInfo when
+available) using the env auth below. Exit non-zero on auth or reachability failure.
+
+**Import (read path)**
+
+``import-jira <jql>`` searches via ``GET /rest/api/2/search``, fetches comments,
+converts wiki → markdown with pandoc, and writes **one draft per issue** under
+``corpus/imports/`` — never into ``corpus/responses/``. ``--dry-run`` lists
+targets without fetching comments.
+
+**Comment write (explicit)**
+
+``jira-comment --issue KEY PATH.md`` converts the markdown with pandoc's free
+``jira`` writer and ``POST``s ``/rest/api/2/issue/{key}/comment``. Use
+``--dry-run`` to print the wiki body without POSTing. This is **not** unattended
+bulk library sync — one file, one issue, human-gated.
 
 **Authentication (environment):**
 
 +------------------------+--------------------------------------------------+
 | Variable               | Role                                             |
 +========================+==================================================+
-| ``JIRA_BASE_URL``      | Required, e.g. Cloud instance URL                |
+| ``JIRA_BASE_URL``      | Required, e.g. Cloud Free instance URL           |
 +------------------------+--------------------------------------------------+
-| ``JIRA_EMAIL`` +       | Basic auth (Jira Cloud convention)               |
+| ``JIRA_EMAIL`` +       | Basic auth (Jira Cloud Free API token)           |
 | ``JIRA_API_TOKEN``     |                                                  |
 +------------------------+--------------------------------------------------+
 | ``JIRA_AUTH_HEADER``   | Raw ``Authorization`` header; wins if set        |

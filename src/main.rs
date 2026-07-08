@@ -6,7 +6,7 @@ use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available}
 use canonic::corpus::{default_corpus_dir, walk_responses};
 use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
 use canonic::index::{default_index_dir, find_duplicates, reindex, search};
-use canonic::jira_import::{default_import_dir, import_jira, JiraConfig};
+use canonic::jira_import::{default_import_dir, format_probe, import_jira, post_comment_from_markdown, probe_jira, JiraConfig};
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -98,6 +98,19 @@ enum Commands {
         #[arg(long, default_value_t = 50)]
         max_results: u32,
         /// List issues that would be imported without fetching comments or writing files
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Probe free Jira REST connectivity and identity (`/rest/api/2/myself`; no Marketplace apps)
+    JiraProbe,
+    /// Post a pandoc-jira comment on an issue (free REST only; explicit, not bulk library sync)
+    JiraComment {
+        /// Issue key, e.g. HSP-101
+        #[arg(long)]
+        issue: String,
+        /// Markdown file to convert and post (pandoc jira writer)
+        path: PathBuf,
+        /// Print converted wiki markup without POSTing
         #[arg(long)]
         dry_run: bool,
     },
@@ -312,6 +325,40 @@ fn run() -> Result<ExitCode> {
             println!("{verb} {} issue(s) into {}:", paths.len(), out_dir.display());
             for p in &paths {
                 println!("  {}", p.display());
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::JiraProbe => {
+            let cfg = JiraConfig::from_env()?;
+            let probe = probe_jira(&cfg)?;
+            print!("{}", format_probe(&probe));
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::JiraComment {
+            issue,
+            path,
+            dry_run,
+        } => {
+            let cfg = JiraConfig::from_env()?;
+            let posted = post_comment_from_markdown(&cfg, &issue, &path, dry_run)?;
+            if dry_run {
+                println!(
+                    "would post comment on {issue} ({} bytes wiki from {}):",
+                    posted.body_wiki.len(),
+                    path.display()
+                );
+                print!("{}", posted.body_wiki);
+                if !posted.body_wiki.ends_with('\n') {
+                    println!();
+                }
+            } else {
+                println!(
+                    "posted comment {} on {} ({} bytes wiki from {})",
+                    posted.comment_id,
+                    posted.issue_key,
+                    posted.body_wiki.len(),
+                    path.display()
+                );
             }
             Ok(ExitCode::SUCCESS)
         }

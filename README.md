@@ -136,9 +136,28 @@ JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIR
 
 `dedupe` rebuilds or reuses the Tantivy index, then for each response runs a self-query (title + content terms) and reports other documents that rank above `--threshold`. Pair reasons include the Tantivy score and a content **Jaccard** similarity for a second opinion. Use a high threshold to list only strong near-copies when curating the library before a Jira migration.
 
-### Jira import (read path)
+### Free Jira REST (no paid Marketplace apps)
 
-`import-jira <jql>` searches Jira via its representational state transfer (REST) API v2 (`/rest/api/2/search`, then `/rest/api/2/issue/{key}/comment` per result), converts each comment's wiki markup back to markdown with pandoc, and writes one draft file per issue under `corpus/imports/` — never directly into `corpus/responses/`, since a human still has to pick the real answer, assign a clean `id`, and set `sop`. `--dry-run` lists which issues canonic would import, without fetching comments.
+canonic talks only to **native Jira platform REST** (Cloud Free API tokens or Server/Data Center PAT). It does **not** use paid Marketplace apps, ScriptRunner, or Service Desk “canned response admin” product APIs.
+
+```bash
+# Probe connectivity + identity (GET /rest/api/2/myself)
+JIRA_BASE_URL=https://your-instance.atlassian.net \
+JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
+  canonic jira-probe
+
+# Import existing issue comments as review drafts (never auto-writes corpus/responses/)
+canonic import-jira "project = HSP AND labels = canned-response" --dry-run
+canonic import-jira "project = HSP AND labels = canned-response"
+
+# Explicit write: convert one markdown file with pandoc jira and POST as an issue comment
+canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
+canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md
+```
+
+- **Read:** `import-jira` → `GET /search` + `GET /issue/{key}/comment` → drafts under `corpus/imports/`.
+- **Write:** `jira-comment` → `POST /issue/{key}/comment` with pandoc `jira` wiki body only. No unattended bulk library sync; review-before-migrate still applies.
+- Bodies use free-compatible wiki markup from pandoc’s `jira` writer (not ADF-only Marketplace formatters).
 
 Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
 

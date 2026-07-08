@@ -76,6 +76,13 @@ export JIRA_EMAIL="advisor"
 export JIRA_API_TOKEN="canonic-test"
 JQL='project = HSP AND labels = canned-response'
 
+echo "==> free-tier jira-probe (myself + serverInfo)"
+PROBE_OUT="$("$BIN" jira-probe 2>&1)"
+echo "$PROBE_OUT"
+echo "$PROBE_OUT" | grep -qi 'ok' || { echo "probe failed" >&2; exit 1; }
+echo "$PROBE_OUT" | grep -qi 'Fixture Advisor\|advisor' || { echo "probe missing identity" >&2; exit 1; }
+echo "$PROBE_OUT" | tee "$WORKDIR/jira-probe.log" >/dev/null
+
 echo "==> dry-run import (no files, no comments fetch for bodies)"
 DRY_OUT="$("$BIN" import-jira "$JQL" --out "$OUT" --dry-run 2>&1)"
 echo "$DRY_OUT"
@@ -145,8 +152,22 @@ MD
 grep -qi 'self-service\|self service\|[*]self-service[*]' "$WORKDIR/smoke.jira" \
   || grep -q 'backup' "$WORKDIR/smoke.jira"
 
+echo "==> free write: jira-comment dry-run (pandoc wiki, no POST)"
+# re-auth basic for write path
+unset JIRA_AUTH_HEADER
+export JIRA_EMAIL="advisor"
+export JIRA_API_TOKEN="canonic-test"
+DRY_CMT="$("$BIN" jira-comment --issue HSP-101 --dry-run "$SAMPLE" 2>&1)"
+echo "$DRY_CMT" | tee "$WORKDIR/jira-comment-dry.log"
+echo "$DRY_CMT" | grep -qi 'would post' || { echo "dry-run comment missing would post" >&2; exit 1; }
+echo "$DRY_CMT" | grep -qi 'self-service\|backup\|Smoke\|h1' || { echo "dry-run body not from convert" >&2; exit 1; }
+
+echo "==> free write: jira-comment POST on HSP-101"
+"$BIN" jira-comment --issue HSP-101 "$SAMPLE" 2>&1 | tee "$WORKDIR/jira-comment-write.log"
+grep -qi 'posted comment' "$WORKDIR/jira-comment-write.log"
+
 echo ""
-echo "OK: import-jira exercised against disposable Jira REST fixture"
+echo "OK: free Jira REST probe + import + comment write against disposable fixture"
 echo "    dry-run filtered labels; Basic + Bearer wrote 3 review drafts under imports/"
 echo "    workdir (trashed on exit unless CANONIC_JIRA_SMOKE_TRASH=0): $WORKDIR"
 

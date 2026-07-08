@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Minimal Jira Server REST API v2 fixture for canonic import-jira tests.
+"""Minimal free-tier Jira Server REST API v2 fixture for canonic.
 
-Implements only what canonic uses:
-  GET /rest/api/2/search?jql=...&startAt=&maxResults=&fields=summary
-  GET /rest/api/2/issue/{key}/comment
+Platform REST only (no Marketplace apps). Implements:
+  GET  /rest/api/2/myself
+  GET  /rest/api/2/serverInfo
+  GET  /rest/api/2/search?jql=...&startAt=&maxResults=&fields=summary
+  GET  /rest/api/2/issue/{key}/comment
+  POST /rest/api/2/issue/{key}/comment   {"body": "<wiki>"}
 
-Seed data mirrors the Support meeting direction: messy personal canned answers
-living as issue comments, to be pulled as review drafts (never auto-promoted).
+Seed data mirrors demo-shaped messy personal canned answers.
 """
 
 from __future__ import annotations
@@ -184,6 +186,34 @@ class Handler(BaseHTTPRequestHandler):
             self._unauth()
             return
 
+        if path in ("/rest/api/2/myself", "/rest/api/2/myself/"):
+            self._json(
+                200,
+                {
+                    "self": f"http://localhost:{PORT}/rest/api/2/user?username={USER}",
+                    "name": USER,
+                    "emailAddress": f"{USER}@example.org",
+                    "displayName": "Fixture Advisor",
+                    "active": True,
+                    "accountId": "fixture-account-1",
+                },
+            )
+            return
+
+        if path in ("/rest/api/2/serverInfo", "/rest/api/2/serverInfo/"):
+            self._json(
+                200,
+                {
+                    "baseUrl": f"http://localhost:{PORT}",
+                    "version": "9.12.15",
+                    "versionNumbers": [9, 12, 15],
+                    "deploymentType": "Server",
+                    "serverTitle": "canonic-jira-fixture",
+                    "buildNumber": 9120015,
+                },
+            )
+            return
+
         if path == "/rest/api/2/search" or path == "/rest/api/2/search/":
             jql = qs.get("jql", [""])[0]
             start = int(qs.get("startAt", ["0"])[0])
@@ -240,6 +270,58 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         self._json(404, {"errorMessages": [f"no fixture route for {path}"]})
+
+    def do_POST(self) -> None:  # noqa: N802
+        if not _auth_ok(self):
+            self._unauth()
+            return
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        raw = self.rfile.read(length) if length else b"{}"
+        try:
+            payload = json.loads(raw.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            self._json(400, {"errorMessages": ["invalid JSON"]})
+            return
+
+        m = re.fullmatch(r"/rest/api/2/issue/([A-Z]+-\d+)/comment", path)
+        if m:
+            key = m.group(1)
+            issue = next((i for i in ISSUES if i["key"] == key), None)
+            if issue is None:
+                self._json(404, {"errorMessages": [f"Issue Does Not Exist: {key}"]})
+                return
+            body = payload.get("body")
+            if not body or not str(body).strip():
+                self._json(400, {"errorMessages": ["comment body required"]})
+                return
+            created = "2026-07-08T12:00:00.000+0000"
+            cid = str(30000 + len(issue["comments"]))
+            issue["comments"].append(
+                {
+                    "author": "Fixture Advisor",
+                    "created": created,
+                    "body": str(body),
+                }
+            )
+            self._json(
+                201,
+                {
+                    "id": cid,
+                    "author": {
+                        "name": USER,
+                        "displayName": "Fixture Advisor",
+                    },
+                    "body": str(body),
+                    "created": created,
+                    "updated": created,
+                },
+            )
+            return
+
+        self._json(404, {"errorMessages": [f"no fixture POST route for {path}"]})
+
 
 
 def main() -> None:

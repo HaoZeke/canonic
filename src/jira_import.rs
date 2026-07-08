@@ -1,8 +1,12 @@
-//! Jira REST API v2 read path: pull existing issue comments into review drafts.
+//! Free-tier Jira REST API v2 (platform only — no Marketplace apps).
 //!
-//! This never writes into `corpus/responses/` directly. Imported drafts land
-//! under a separate directory so a human reviews and promotes each one,
-//! matching the "review before migration" rule the quality checks enforce.
+//! - **Probe:** `GET /rest/api/2/myself` (+ serverInfo) for connectivity/auth.
+//! - **Read:** JQL search + issue comments → review drafts under `corpus/imports/`
+//!   (never `corpus/responses/`).
+//! - **Write:** explicit `POST /rest/api/2/issue/{key}/comment` with pandoc
+//!   `jira` wiki body — human-gated, not bulk library sync.
+//!
+//! Cloud Free API tokens and Server/DC PATs both work via the same env auth.
 
 use crate::convert::convert_jira_to_markdown;
 use anyhow::{bail, Context, Result};
@@ -308,6 +312,243 @@ pub fn import_jira(
     Ok(written)
 }
 
+/// Result of a free-tier connectivity probe (`/myself` + optional serverInfo).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JiraProbe {
+    pub base_url: String,
+    pub display_name: String,
+    pub account: String,
+    pub server_title: Option<String>,
+    pub server_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MyselfResponse {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(rename = "displayName", default)]
+    display_name: Option<String>,
+    #[serde(rename = "accountId", default)]
+    account_id: Option<String>,
+    #[serde(rename = "emailAddress", default)]
+    email: Option<String>,
+}
+
+fn parse_myself_response(json: &str) -> Result<(String, String)> {
+    let parsed: MyselfResponse =
+        serde_json::from_str(json).context("parse Jira /myself response")?;
+    let display = parsed
+        .display_name
+        .or_else(|| parsed.name.clone())
+        .or_else(|| parsed.email.clone())
+        .unwrap_or_else(|| "(unknown)".into());
+    let account = parsed
+        .account_id
+        .or(parsed.name)
+        .or(parsed.email)
+        .unwrap_or_else(|| "(unknown)".into());
+    Ok((display, account))
+}
+
+#[derive(Debug, Deserialize)]
+struct ServerInfoResponse {
+    #[serde(rename = "serverTitle", default)]
+    server_title: Option<String>,
+    #[serde(default)]
+    version: Option<String>,
+}
+
+fn parse_server_info_response(json: &str) -> Result<(Option<String>, Option<String>)> {
+    let parsed: ServerInfoResponse =
+        serde_json::from_str(json).context("parse Jira /serverInfo response")?;
+    Ok((parsed.server_title, parsed.version))
+}
+
+fn build_myself_request(
+    client: &reqwest::blocking::Client,
+    cfg: &JiraConfig,
+) -> reqwest::Result<reqwest::blocking::Request> {
+    let url = format!("{}/rest/api/2/myself", cfg.base_url.trim_end_matches('/'));
+    apply_auth(client.get(&url), &cfg.auth).build()
+}
+
+fn build_server_info_request(
+    client: &reqwest::blocking::Client,
+    cfg: &JiraConfig,
+) -> reqwest::Result<reqwest::blocking::Request> {
+    let url = format!(
+        "{}/rest/api/2/serverInfo",
+        cfg.base_url.trim_end_matches('/')
+    );
+    apply_auth(client.get(&url), &cfg.auth).build()
+}
+
+/// Probe free Jira REST: authenticated identity + optional server banner.
+///
+/// Uses only platform endpoints (`/rest/api/2/myself`, `/serverInfo`) — no
+/// Marketplace apps. Exit path for CLI: non-zero when HTTP fails or auth rejects.
+pub fn probe_jira(cfg: &JiraConfig) -> Result<JiraProbe> {
+    let client = reqwest::blocking::Client::new();
+    let req = build_myself_request(&client, cfg).context("build /myself request")?;
+    let resp = client.execute(req).context("send /myself request")?;
+    if !resp.status().is_success() {
+        bail!(
+            "Jira probe failed (auth or reachability): HTTP {} on /rest/api/2/myself — free Cloud needs email+API token; Server/DC may use JIRA_AUTH_HEADER",
+            resp.status()
+        );
+    }
+    let body = resp.text().context("read /myself body")?;
+    let (display_name, account) = parse_myself_response(&body)?;
+
+    let mut server_title = None;
+    let mut server_version = None;
+    if let Ok(req) = build_server_info_request(&client, cfg) {
+        if let Ok(resp) = client.execute(req) {
+            if resp.status().is_success() {
+                if let Ok(text) = resp.text() {
+                    if let Ok((t, v)) = parse_server_info_response(&text) {
+                        server_title = t;
+                        server_version = v;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(JiraProbe {
+        base_url: cfg.base_url.trim_end_matches('/').to_string(),
+        display_name,
+        account,
+        server_title,
+        server_version,
+    })
+}
+
+/// Format a probe result for CLI stdout.
+pub fn format_probe(probe: &JiraProbe) -> String {
+    let mut lines = vec![
+        format!("jira: ok — free REST platform API (no Marketplace apps)"),
+        format!("  base: {}", probe.base_url),
+        format!("  user: {} ({})", probe.display_name, probe.account),
+    ];
+    if let Some(ref t) = probe.server_title {
+        lines.push(format!("  server: {t}"));
+    }
+    if let Some(ref v) = probe.server_version {
+        lines.push(format!("  version: {v}"));
+    }
+    lines.push(
+        "  note: write uses POST issue comment only; bulk library sync stays human-gated"
+            .into(),
+    );
+    lines.join("\n") + "\n"
+}
+
+/// One comment created via free REST POST.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PostedComment {
+    pub issue_key: String,
+    pub comment_id: String,
+    pub body_wiki: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CommentCreateResponse {
+    id: Option<String>,
+    #[serde(default)]
+    body: Option<String>,
+}
+
+fn parse_comment_create_response(json: &str) -> Result<(String, Option<String>)> {
+    let parsed: CommentCreateResponse =
+        serde_json::from_str(json).context("parse Jira comment create response")?;
+    let id = parsed
+        .id
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "(unknown)".into());
+    Ok((id, parsed.body))
+}
+
+fn build_comment_post_request(
+    client: &reqwest::blocking::Client,
+    cfg: &JiraConfig,
+    issue_key: &str,
+    body_wiki: &str,
+) -> reqwest::Result<reqwest::blocking::Request> {
+    let url = format!(
+        "{}/rest/api/2/issue/{issue_key}/comment",
+        cfg.base_url.trim_end_matches('/')
+    );
+    let payload = serde_json::json!({ "body": body_wiki });
+    apply_auth(client.post(&url).json(&payload), &cfg.auth).build()
+}
+
+/// POST a wiki-markup comment on an issue via free platform REST.
+///
+/// Body must already be Jira wiki (e.g. from [`crate::convert::convert_markdown_to_jira`]).
+/// This is the only free write surface canonic ships — not a canned-response
+/// admin product API and not a Marketplace extension.
+pub fn post_issue_comment(
+    cfg: &JiraConfig,
+    issue_key: &str,
+    body_wiki: &str,
+) -> Result<PostedComment> {
+    if issue_key.trim().is_empty() {
+        bail!("issue key is empty");
+    }
+    if body_wiki.trim().is_empty() {
+        bail!("comment body is empty");
+    }
+    let client = reqwest::blocking::Client::new();
+    let req = build_comment_post_request(&client, cfg, issue_key, body_wiki)
+        .with_context(|| format!("build comment POST for {issue_key}"))?;
+    let resp = client
+        .execute(req)
+        .with_context(|| format!("POST comment on {issue_key}"))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let detail = resp.text().unwrap_or_default();
+        bail!(
+            "posting comment on {issue_key} failed: HTTP {status}{}",
+            if detail.is_empty() {
+                String::new()
+            } else {
+                format!(" — {detail}")
+            }
+        );
+    }
+    let text = resp.text().context("read comment create body")?;
+    let (comment_id, _) = parse_comment_create_response(&text)?;
+    Ok(PostedComment {
+        issue_key: issue_key.to_string(),
+        comment_id,
+        body_wiki: body_wiki.to_string(),
+    })
+}
+
+/// Convert a markdown corpus file with pandoc jira writer, then POST as a comment.
+///
+/// When `dry_run` is true, returns the wiki body that would be posted without
+/// calling Jira (still requires pandoc for a real conversion).
+pub fn post_comment_from_markdown(
+    cfg: &JiraConfig,
+    issue_key: &str,
+    markdown_path: &Path,
+    dry_run: bool,
+) -> Result<PostedComment> {
+    let wiki = crate::convert::convert_path_to_jira(markdown_path)
+        .with_context(|| format!("convert {} to jira markup", markdown_path.display()))?;
+    if dry_run {
+        return Ok(PostedComment {
+            issue_key: issue_key.to_string(),
+            comment_id: "(dry-run)".into(),
+            body_wiki: wiki,
+        });
+    }
+    post_issue_comment(cfg, issue_key, &wiki)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,5 +673,138 @@ mod tests {
         std::env::remove_var("JIRA_BASE_URL");
         let err = JiraConfig::from_env().unwrap_err().to_string();
         assert!(err.contains("JIRA_BASE_URL"));
+    }
+
+    const MYSELF_FIXTURE: &str = r#"{
+        "self": "https://example.atlassian.net/rest/api/2/user?username=advisor",
+        "name": "advisor",
+        "emailAddress": "advisor@example.org",
+        "displayName": "Advisor User",
+        "active": true,
+        "accountId": "abc-123"
+    }"#;
+
+    const SERVER_INFO_FIXTURE: &str = r#"{
+        "baseUrl": "https://example.atlassian.net",
+        "version": "9.12.15",
+        "versionNumbers": [9, 12, 15],
+        "deploymentType": "Server",
+        "serverTitle": "canonic-smoke"
+    }"#;
+
+    const COMMENT_CREATE_FIXTURE: &str = r#"{
+        "id": "30001",
+        "author": { "name": "advisor", "displayName": "Advisor User" },
+        "body": "h1. Smoke\n\nUse *self-service*.",
+        "created": "2026-07-08T12:00:00.000+0000"
+    }"#;
+
+    #[test]
+    fn parses_myself_for_probe() {
+        let (display, account) = parse_myself_response(MYSELF_FIXTURE).unwrap();
+        assert_eq!(display, "Advisor User");
+        assert_eq!(account, "abc-123");
+    }
+
+    #[test]
+    fn parses_server_info_for_probe() {
+        let (title, ver) = parse_server_info_response(SERVER_INFO_FIXTURE).unwrap();
+        assert_eq!(title.as_deref(), Some("canonic-smoke"));
+        assert_eq!(ver.as_deref(), Some("9.12.15"));
+    }
+
+    #[test]
+    fn format_probe_mentions_free_rest() {
+        let text = format_probe(&JiraProbe {
+            base_url: "https://example.atlassian.net".into(),
+            display_name: "Advisor User".into(),
+            account: "abc-123".into(),
+            server_title: Some("canonic-smoke".into()),
+            server_version: Some("9.12.15".into()),
+        });
+        assert!(text.contains("free REST"));
+        assert!(text.contains("Advisor User"));
+        assert!(text.contains("Marketplace") || text.contains("no Marketplace"));
+        assert!(text.contains("https://example.atlassian.net"));
+    }
+
+    #[test]
+    fn myself_request_targets_v2_myself() {
+        let client = reqwest::blocking::Client::new();
+        let cfg = JiraConfig::new(
+            "https://example.atlassian.net/",
+            JiraAuth::Basic {
+                user: "a@b.c".into(),
+                token: "t".into(),
+            },
+        );
+        let req = build_myself_request(&client, &cfg).unwrap();
+        assert_eq!(req.url().path(), "/rest/api/2/myself");
+        assert!(req.headers().contains_key(reqwest::header::AUTHORIZATION));
+    }
+
+    #[test]
+    fn comment_post_request_is_post_with_json_body() {
+        let client = reqwest::blocking::Client::new();
+        let cfg = JiraConfig::new(
+            "https://jira.example.org",
+            JiraAuth::Header("Bearer pat".into()),
+        );
+        let wiki = "h1. Smoke\n\nBody *bold*.";
+        let req = build_comment_post_request(&client, &cfg, "HSP-101", wiki).unwrap();
+        assert_eq!(req.method(), reqwest::Method::POST);
+        assert_eq!(req.url().path(), "/rest/api/2/issue/HSP-101/comment");
+        let body = String::from_utf8_lossy(req.body().unwrap().as_bytes().unwrap());
+        assert!(body.contains("body"), "{body}");
+        assert!(body.contains("Smoke") || body.contains("h1"), "{body}");
+        assert_eq!(
+            req.headers().get(reqwest::header::AUTHORIZATION).unwrap(),
+            "Bearer pat"
+        );
+    }
+
+    #[test]
+    fn parses_comment_create_response() {
+        let (id, body) = parse_comment_create_response(COMMENT_CREATE_FIXTURE).unwrap();
+        assert_eq!(id, "30001");
+        let body = body.unwrap_or_default();
+        assert!(body.contains("self-service") || body.contains("h1"), "{body}");
+    }
+
+    #[test]
+    fn post_comment_from_markdown_dry_run_uses_pandoc_convert() {
+        if !crate::convert::tool_available() {
+            return;
+        }
+        let base = std::env::var_os("CARGO_TARGET_TMPDIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-tmp"));
+        let _ = std::fs::create_dir_all(&base);
+        let md = base.join("resp-smoke-jira-comment.md");
+        std::fs::write(
+            &md,
+            "---\nid: resp-smoke\ntitle: Smoke\nprefix: resp\nsop: none\n---\n\n# Smoke\n\nUse *self-service* for backups.\n\nRegards,\nSupport Team\n",
+        )
+        .expect("write smoke markdown under target/");
+        let cfg = JiraConfig::new(
+            "http://127.0.0.1:9",
+            JiraAuth::Basic {
+                user: "x".into(),
+                token: "y".into(),
+            },
+        );
+        let posted = post_comment_from_markdown(&cfg, "HSP-101", &md, true).expect("dry-run");
+        assert_eq!(posted.comment_id, "(dry-run)");
+        assert_eq!(posted.issue_key, "HSP-101");
+        let via_convert = crate::convert::convert_path_to_jira(&md).expect("convert");
+        assert_eq!(posted.body_wiki, via_convert);
+        assert!(
+            posted.body_wiki.contains("self-service")
+                || posted.body_wiki.contains("Smoke")
+                || posted.body_wiki.contains("h1"),
+            "unexpected wiki: {:?}",
+            posted.body_wiki
+        );
+        let _ = std::fs::remove_file(&md);
     }
 }

@@ -12,7 +12,7 @@
 //! | [`index`] | Tantivy BM25 search and near-duplicate pairs |
 //! | [`lint`] | Vale CLI + in-process Harper |
 //! | [`doctor`] | Tooling probes |
-//! | [`jira_import`] | REST v2 read path → review drafts |
+//! | [`jira_import`] | Free REST probe, read import, explicit comment POST |
 //!
 //! ## Example
 //!
@@ -51,7 +51,10 @@ pub use index::{
     default_index_dir, find_duplicates, find_duplicates_jaccard, jaccard_similarity, reindex,
     search, self_query_for, tokenize, DedupePair, IndexDoc, SearchHit,
 };
-pub use jira_import::{default_import_dir, import_jira, JiraAuth, JiraConfig};
+pub use jira_import::{
+    default_import_dir, format_probe, import_jira, post_comment_from_markdown, post_issue_comment,
+    probe_jira, JiraAuth, JiraConfig, JiraProbe, PostedComment,
+};
 pub use lint::{
     format_report, lint_paths, lint_text_harper_inprocess, LintEngine, LintFinding, LintReport,
 };
