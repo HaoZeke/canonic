@@ -79,9 +79,16 @@ echo "$CHECK_OUT" | grep -q '0 finding' || {
 }
 
 echo "==> reindex + search"
-REINDEX_OUT="$("$BIN" reindex)"
+# Isolated index dir so parallel tests / concurrent writers do not fight
+# over the repo-local .canonic-index lock.
+INDEX_DIR="${CANONIC_TUTORIAL_INDEX:-$ROOT/.canonic-index-tutorial}"
+mkdir -p "$INDEX_DIR"
+trap '[[ "${CANONIC_TUTORIAL_KEEP_INDEX:-0}" == "1" ]] || rm -rf "$INDEX_DIR"' EXIT
+REINDEX_OUT="$("$BIN" reindex --index "$INDEX_DIR")"
 echo "$REINDEX_OUT"
-SEARCH_OUT="$("$BIN" search "shared quota" -n 3)"
+# Normalize printed path for committed captures
+REINDEX_OUT_STABLE="$(echo "$REINDEX_OUT" | sed "s|$INDEX_DIR|.canonic-index|g")"
+SEARCH_OUT="$("$BIN" search "shared quota" -n 3 --index "$INDEX_DIR")"
 echo "$SEARCH_OUT"
 echo "$SEARCH_OUT" | grep -q 'resp-demo-shared-quota' || {
   echo "error: search missed resp-demo-shared-quota" >&2
@@ -115,7 +122,7 @@ if [[ "$CAPTURE" -eq 1 ]]; then
     echo "$CHECK_OUT"
     echo
     echo "\$ canonic reindex && canonic search \"shared quota\" -n 3"
-    echo "$REINDEX_OUT" | stabilize
+    echo "$REINDEX_OUT_STABLE" | stabilize
     echo "$SEARCH_OUT" | stabilize
     if [[ -n "$CONV_OUT" ]]; then
       echo
