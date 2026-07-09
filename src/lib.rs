@@ -6,35 +6,39 @@
 //!
 //! | Module | Role |
 //! |--------|------|
-//! | [`corpus`] | Walk and load `resp-*.md` responses |
+//! | [`config`] | `canonic.toml` / `--prefix` shared id prefix |
+//! | [`corpus`] | Walk and load `{prefix}-*.md` responses |
 //! | [`check`] | Quality gate (prefix, sop, closings) |
 //! | [`convert`] | Pandoc markdown ↔ Jira wiki markup |
 //! | [`index`] | Tantivy BM25 search and near-duplicate pairs |
 //! | [`lint`] | Vale CLI + in-process Harper |
 //! | [`doctor`] | Tooling probes |
 //! | [`jira_import`] | Free REST probe, read import, explicit comment POST |
-//! | [`scaffold`] | New `resp-` templates and promote import → responses |
+//! | [`scaffold`] | New templates and promote import → responses |
 //! | [`tui`] | Interactive ratatui corpus browser (`canonic tui`) |
 //!
 //! ## Example
 //!
 //! ```no_run
-//! use canonic::{default_corpus_dir, walk_responses, check_responses};
+//! use canonic::{default_corpus_dir, walk_responses, check_responses, DEFAULT_PREFIX};
 //!
 //! let dir = default_corpus_dir();
 //! let responses = walk_responses(&dir).expect("read corpus");
-//! let report = check_responses(&responses);
+//! let report = check_responses(&responses, DEFAULT_PREFIX);
 //! assert!(report.ok() || !report.findings.is_empty());
 //! ```
 //!
-//! Markdown under `corpus/responses/` remains the source of truth. Jira is a
-//! publication surface: convert for paste-in, import only as drafts under
-//! `corpus/imports/`, then [`scaffold::promote_to_corpus`] after review.
+//! Markdown under `corpus/responses/` remains the source of truth. The shared
+//! id prefix is **user-chosen** (`canonic.toml` `prefix`, `--prefix`, or
+//! `CANONIC_PREFIX`; default `resp`). Jira is a publication surface: convert
+//! for paste-in, import only as drafts under `corpus/imports/`, then
+//! [`scaffold::promote_to_corpus`] after review.
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/mark.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/favicon.svg")]
 
 pub mod check;
+pub mod config;
 pub mod convert;
 pub mod corpus;
 pub mod doctor;
@@ -44,7 +48,11 @@ pub mod lint;
 pub mod scaffold;
 pub mod tui;
 
-pub use check::{check_corpus, check_responses, format_check_report, CheckReport, REQUIRED_PREFIX};
+pub use check::{check_corpus, check_responses, format_check_report, CheckReport};
+pub use config::{
+    find_config_path, load_config, load_config_file, normalize_prefix, resolve_prefix,
+    CanonicConfig, DEFAULT_PREFIX,
+};
 pub use convert::{
     convert_jira_to_markdown, convert_markdown_to_jira, convert_path_to_jira,
     tool_available as pandoc_available,
@@ -68,4 +76,4 @@ pub use scaffold::{
     check_response_path, promote_to_corpus, resolve_response_id, scaffold_markdown, write_scaffold,
     ScaffoldOptions, TEAM_SIGN_OFF,
 };
-pub use tui::{run_tui, App as TuiApp};
+pub use tui::{run_tui, run_tui_with_prefix, App as TuiApp};

@@ -7,7 +7,24 @@
   <img src="docs/source/_static/logo.svg" width="280" alt="canonic logo" />
 </p>
 
-**canonic** is a versioned **Jira canned-response** corpus tool: markdown under a shared **`resp-`** id prefix is the source of truth. Convert with **pandoc**, enforce **quality checks**, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25). The `resp-` prefix is a configurable naming convention, not a product brand.
+**canonic** is a versioned **Jira canned-response** corpus tool: markdown under a **shared id prefix you choose** (`canonic.toml` / `--prefix` / `CANONIC_PREFIX`, default `resp`) is the source of truth. Convert with **pandoc**, enforce **quality checks**, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
+
+
+## Configuration
+
+Shared library id prefix (front matter `prefix` and `{prefix}-*.md` filenames):
+
+```toml
+# canonic.toml (repo root; walk-up discovery)
+prefix = "resp"
+```
+
+Override without editing the file:
+
+```bash
+canonic --prefix acme check
+CANONIC_PREFIX=acme canonic new "Topic title"
+```
 
 ## Docs site (Shibuya)
 
@@ -105,7 +122,7 @@ scripts/mirror-to-gitlab.sh
 
 Import drafts stay under `corpus/imports/` (gitignored) until `canonic promote`. There is **no** bulk auto-sync of the library into Jira.
 
-## Corpus layout (`resp` prefix)
+## Corpus layout (configured prefix prefix)
 
 ```
 corpus/responses/
@@ -295,7 +312,7 @@ Pass a branch name as the first argument to override the current branch.
 
 - **Tantivy BM25** for search and near-duplicate discovery (better fit for curation/dedupe than a hand-rolled store).
 - Markdown remains the source of truth; Jira is a publication surface. `canonic convert` produces the wiki markup for a human to paste in; `canonic import-jira` reads existing issue comments back out as drafts. Neither direction writes to Jira automatically.
-- Quality checks implement the meeting rule: **review before migration**, shared `resp` prefix only.
+- Quality checks implement the meeting rule: **review before migration**, shared configured prefix prefix only.
 
 ## Citation
 

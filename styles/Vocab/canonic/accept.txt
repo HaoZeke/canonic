@@ -5,7 +5,6 @@
 [Bb]m25
 [Dd]edupe
 canonic
-[Ss]nell
 [Cc]onfluence
 [Aa]tlassian
 ADF

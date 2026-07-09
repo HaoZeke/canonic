@@ -2,7 +2,7 @@
 //!
 //! Walks real repository files. Denylist tokens are built without contiguous
 //! org spellings so a repo-wide search for those brands stays clean.
-//! The technical id prefix `resp-` is allowed as a naming convention only.
+//! Also rejects the old hardcoded cluster short form as an id convention.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,10 @@ fn denylist() -> Vec<String> {
     let cluster = ["S", "nellius"].concat();
     let cluster_up = ["S", "NELLIUS"].concat();
     let host = format!("{}.{}", "surf", "nl");
+    // Former hardcoded id prefix (cluster short form); ids are config-driven now.
+    let short_prefix = ["s", "nell"].concat();
     vec![
+        short_prefix,
         format!("confluence.{}", host),
         format!("gitlab.{}", host),
         format!("{org} HPC Advisors"),
@@ -40,6 +43,7 @@ fn public_rel_paths() -> Vec<&'static str> {
     vec![
         "README.md",
         "Cargo.toml",
+        "canonic.toml",
         "CITATION.cff",
         "src/main.rs",
         "src/lib.rs",

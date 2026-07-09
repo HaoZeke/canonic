@@ -192,7 +192,6 @@ fn domain_vocab_tokens() -> Vec<String> {
         "bm25",
         "dedupe",
         "canonic",
-        "resp",
         "confluence",
         "atlassian",
         "adf",

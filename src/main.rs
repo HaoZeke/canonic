@@ -2,6 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use canonic::check::{check_corpus, format_check_report};
+use canonic::config::{load_config, resolve_prefix};
 use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available};
 use canonic::corpus::{default_corpus_dir, walk_responses};
 use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
@@ -12,7 +13,7 @@ use canonic::jira_import::{
 };
 use canonic::lint::{format_report, lint_paths, LintEngine};
 use canonic::scaffold::{promote_to_corpus, write_scaffold, ScaffoldOptions};
-use canonic::tui::run_tui;
+use canonic::tui::run_tui_with_prefix;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -24,6 +25,12 @@ use std::process::ExitCode;
     about = "Versioned Jira canned-response corpus: convert, quality check, Tantivy search/dedupe"
 )]
 struct Cli {
+    /// Path to canonic.toml (default: walk up from cwd for canonic.toml)
+    #[arg(long, global = true)]
+    config: Option<PathBuf>,
+    /// Shared response id prefix (overrides canonic.toml / CANONIC_PREFIX)
+    #[arg(long, global = true)]
+    prefix: Option<String>,
     #[command(subcommand)]
     command: Commands,
 }
@@ -42,11 +49,11 @@ enum Commands {
         #[arg(long)]
         corpus: Option<PathBuf>,
     },
-    /// Scaffold a new check-clean `resp-` response from a title (template)
+    /// Scaffold a new check-clean response from a title (uses configured prefix)
     New {
         /// Human title (also used for the H1 and default id slug)
         title: String,
-        /// Explicit id (`resp-…`); default: `resp-<slug of title>`
+        /// Explicit id (`{prefix}-…`); default: `{prefix}-<slug of title>`
         #[arg(long)]
         id: Option<String>,
         /// Front-matter sop (Confluence URL or `none`)
@@ -73,7 +80,7 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
-    /// Quality gate: resp- ids, prefix/sop front matter, personal sign-offs
+    /// Quality gate: configured prefix ids, sop front matter, personal sign-offs
     Check {
         #[arg(long)]
         corpus: Option<PathBuf>,
@@ -194,6 +201,8 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
+    let file_cfg = load_config(cli.config.as_deref())?;
+    let prefix = resolve_prefix(cli.prefix.as_deref(), &file_cfg)?;
     match cli.command {
         Commands::Doctor => {
             let statuses = collect_statuses();
@@ -206,7 +215,7 @@ fn run() -> Result<ExitCode> {
         }
         Commands::Tui { corpus } => {
             let corpus = corpus.unwrap_or_else(default_corpus_dir);
-            run_tui(corpus)?;
+            run_tui_with_prefix(corpus, &prefix)?;
             Ok(ExitCode::SUCCESS)
         }
         Commands::List { corpus } => {
@@ -245,6 +254,7 @@ fn run() -> Result<ExitCode> {
             let opts = ScaffoldOptions {
                 title,
                 id,
+                prefix: prefix.clone(),
                 sop,
                 tags: tag_list,
                 body: None,
@@ -259,13 +269,13 @@ fn run() -> Result<ExitCode> {
             force,
         } => {
             let dest_dir = corpus.unwrap_or_else(default_corpus_dir);
-            let dest = promote_to_corpus(&path, &dest_dir, force)?;
+            let dest = promote_to_corpus(&path, &dest_dir, force, &prefix)?;
             println!("promoted {} → {}", path.display(), dest.display());
             Ok(ExitCode::SUCCESS)
         }
         Commands::Check { corpus, json } => {
             let corpus = corpus.unwrap_or_else(default_corpus_dir);
-            let report = check_corpus(&corpus)?;
+            let report = check_corpus(&corpus, &prefix)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -427,7 +437,7 @@ fn run() -> Result<ExitCode> {
         } => {
             let cfg = JiraConfig::from_env()?;
             let out_dir = out.unwrap_or_else(default_import_dir);
-            let paths = import_jira(&cfg, &jql, &out_dir, max_results, dry_run)?;
+            let paths = import_jira(&cfg, &jql, &out_dir, max_results, dry_run, &prefix)?;
             let verb = if dry_run { "would import" } else { "imported" };
             println!("{verb} {} issue(s) into {}:", paths.len(), out_dir.display());
             for p in &paths {

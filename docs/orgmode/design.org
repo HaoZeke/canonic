@@ -29,7 +29,7 @@ Design notes
      </li>
      <li>
        <h3>Review before migrate</h3>
-       <p>Quality checks encode the meeting rule: shared <code>resp</code> prefix only,
+       <p>Quality checks encode the meeting rule: shared configured prefix only,
        valid front matter, team-generic closings — gate the library before Jira.
        CI runs <code>check</code> and in-process Harper on published responses.</p>
      </li>

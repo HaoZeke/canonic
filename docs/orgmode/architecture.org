@@ -9,7 +9,7 @@ Architecture
 .. raw:: html
 
    <div class="cn-page-intro">
-     <p>Markdown under a shared <code>resp-</code> prefix is the only source of truth.
+     <p>Markdown under a shared configured prefix is the only source of truth.
      Quality gates and a local Tantivy index sit in front of Jira publication.</p>
    </div>
 

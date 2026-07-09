@@ -13,7 +13,7 @@ pub struct CannedResponse {
     pub id: String,
     /// Display title (front matter `title` or first heading / id).
     pub title: String,
-    /// Shared prefix (front matter `prefix`, e.g. `resp`).
+    /// Shared prefix (front matter `prefix`, e.g. `resp` or a team-chosen token).
     pub prefix: Option<String>,
     /// Optional SOP link or the literal `none`.
     pub sop: Option<String>,

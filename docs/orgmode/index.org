@@ -16,10 +16,10 @@
      </div>
      <img class="cn-hero-logo cn-hero-logo-light" src="_static/logo.svg" width="320" height="60" alt="canonic" />
      <img class="cn-hero-logo cn-hero-logo-dark" src="_static/logo-dark.svg" width="320" height="60" alt="canonic" />
-     <p class="cn-hero-tagline">Versioned canned-response corpus for Jira workflows — markdown under a shared <code>resp-</code> prefix is the source of truth. Convert with pandoc, gate with quality checks, search and dedupe with Tantivy.</p>
+     <p class="cn-hero-tagline">Versioned canned-response corpus for Jira workflows — markdown under a shared configured prefix is the source of truth. Convert with pandoc, gate with quality checks, search and dedupe with Tantivy.</p>
      <div class="cn-hero-pills">
        <span>markdown corpus</span>
-       <span>resp- prefix</span>
+       <span>shared prefix</span>
        <span>pandoc → jira</span>
        <span>Tantivy BM25</span>
        <span>review before migrate</span>
@@ -49,7 +49,7 @@ Workflow at a glance
      <li>
        <span class="cn-flow-n">1</span>
        <span class="cn-flow-title">Author in markdown</span>
-       <span class="cn-flow-desc">Shared <code>resp-</code> prefix, front matter, team closing.</span>
+       <span class="cn-flow-desc">Shared configured prefix, front matter, team closing.</span>
        <span class="cn-flow-cmd">corpus/responses/</span>
      </li>
      <li>

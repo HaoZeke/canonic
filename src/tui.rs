@@ -4,6 +4,7 @@
 //! [`ratatui::backend::TestBackend`]; the live loop uses crossterm.
 
 use crate::check::{check_responses, format_check_report, CheckReport};
+use crate::config::DEFAULT_PREFIX;
 use crate::convert::{convert_path_to_jira, tool_available as pandoc_available};
 use crate::corpus::{load_response, walk_responses, CannedResponse};
 use crate::doctor::{collect_statuses, format_doctor};
@@ -54,6 +55,8 @@ pub struct ListEntry {
 #[derive(Debug)]
 pub struct App {
     pub corpus: PathBuf,
+    /// Shared library prefix from canonic.toml / --prefix.
+    pub prefix: String,
     pub responses: Vec<CannedResponse>,
     pub entries: Vec<ListEntry>,
     pub list_state: ListState,
@@ -69,6 +72,11 @@ pub struct App {
 impl App {
     /// Load corpus from disk and build initial list + selection.
     pub fn load(corpus: PathBuf) -> Result<Self> {
+        Self::load_with_prefix(corpus, DEFAULT_PREFIX)
+    }
+
+    /// Load corpus using an explicit shared prefix for quality checks.
+    pub fn load_with_prefix(corpus: PathBuf, prefix: &str) -> Result<Self> {
         let responses = if corpus.exists() {
             walk_responses(&corpus)?
         } else {
@@ -76,6 +84,7 @@ impl App {
         };
         let mut app = Self {
             corpus,
+            prefix: prefix.to_string(),
             responses,
             entries: Vec::new(),
             list_state: ListState::default(),
@@ -118,7 +127,7 @@ impl App {
                     || r.tags.iter().any(|t| t.to_lowercase().contains(&q))
             })
             .map(|r| {
-                let report = check_responses(std::slice::from_ref(r));
+                let report = check_responses(std::slice::from_ref(r), &self.prefix);
                 ListEntry {
                     id: r.id.clone(),
                     title: r.title.clone(),
@@ -175,7 +184,7 @@ impl App {
     pub fn update_preview(&mut self) {
         match self.selected_response() {
             Some(r) => {
-                let report = check_responses(std::slice::from_ref(r));
+                let report = check_responses(std::slice::from_ref(r), &self.prefix);
                 let mut preview = r.body.clone();
                 if preview.len() > 12_000 {
                     preview.truncate(12_000);
@@ -231,7 +240,7 @@ impl App {
 
     /// Run quality check over the full (unfiltered) corpus and show the report.
     pub fn run_check_all(&mut self) -> Result<()> {
-        let report: CheckReport = check_responses(&self.responses);
+        let report: CheckReport = check_responses(&self.responses, &self.prefix);
         self.status = report.summary_line();
         self.preview = format_check_report(&report);
         self.rebuild_entries();
@@ -430,7 +439,7 @@ impl App {
                 let q = if self.filter.is_empty() {
                     self.selected_entry()
                         .map(|e| e.title.clone())
-                        .unwrap_or_else(|| "resp".into())
+                        .unwrap_or_default()
                 } else {
                     self.filter.clone()
                 };
@@ -634,7 +643,11 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 
 /// Run the interactive TUI until the user quits.
 pub fn run_tui(corpus: PathBuf) -> Result<()> {
-    let mut app = App::load(corpus)?;
+    run_tui_with_prefix(corpus, DEFAULT_PREFIX)
+}
+
+pub fn run_tui_with_prefix(corpus: PathBuf, prefix: &str) -> Result<()> {
+    let mut app = App::load_with_prefix(corpus, prefix)?;
     let mut terminal = setup_terminal()?;
     let result = run_loop(&mut terminal, &mut app);
     restore_terminal(&mut terminal)?;
@@ -700,7 +713,16 @@ pub fn render_test_frame(app: &mut App, width: u16, height: u16) -> Result<Strin
 
 /// Open path as a single-file corpus view (load parent dir, select that id).
 pub fn load_focusing(corpus: PathBuf, focus_path: Option<&Path>) -> Result<App> {
-    let mut app = App::load(corpus)?;
+    load_focusing_with_prefix(corpus, focus_path, DEFAULT_PREFIX)
+}
+
+/// Like [`load_focusing`] with an explicit shared prefix.
+pub fn load_focusing_with_prefix(
+    corpus: PathBuf,
+    focus_path: Option<&Path>,
+    prefix: &str,
+) -> Result<App> {
+    let mut app = App::load_with_prefix(corpus, prefix)?;
     if let Some(path) = focus_path {
         if path.is_file() {
             let doc = load_response(path)?;

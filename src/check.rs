@@ -1,4 +1,4 @@
-//! Corpus quality checks for the shared `resp` prefix migration.
+//! Corpus quality checks for a configured shared id prefix.
 
 use crate::corpus::{walk_responses, CannedResponse};
 use anyhow::Result;
@@ -6,9 +6,6 @@ use regex::Regex;
 use serde::Serialize;
 use std::path::Path;
 use std::sync::OnceLock;
-
-/// Shared id/prefix convention for the published response library.
-pub const REQUIRED_PREFIX: &str = "resp";
 
 /// One quality finding.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -40,17 +37,17 @@ impl CheckReport {
     }
 }
 
-/// Run all quality rules over a corpus directory.
-pub fn check_corpus(root: &Path) -> Result<CheckReport> {
+/// Run all quality rules over a corpus directory using `prefix` (from config/CLI).
+pub fn check_corpus(root: &Path, prefix: &str) -> Result<CheckReport> {
     let docs = walk_responses(root)?;
-    Ok(check_responses(&docs))
+    Ok(check_responses(&docs, prefix))
 }
 
 /// Pure quality rules over already-loaded responses (unit-testable).
-pub fn check_responses(docs: &[CannedResponse]) -> CheckReport {
+pub fn check_responses(docs: &[CannedResponse], prefix: &str) -> CheckReport {
     let mut findings = Vec::new();
     for doc in docs {
-        findings.extend(check_one(doc));
+        findings.extend(check_one(doc, prefix));
     }
     // Duplicate ids across corpus
     let mut seen: std::collections::HashMap<&str, &Path> = std::collections::HashMap::new();
@@ -74,17 +71,18 @@ pub fn check_responses(docs: &[CannedResponse]) -> CheckReport {
     }
 }
 
-fn check_one(doc: &CannedResponse) -> Vec<CheckFinding> {
+fn check_one(doc: &CannedResponse, prefix: &str) -> Vec<CheckFinding> {
     let mut out = Vec::new();
     let path = doc.path.display().to_string();
+    let id_prefix = format!("{prefix}-");
 
-    if !doc.id.starts_with(&format!("{REQUIRED_PREFIX}-")) {
+    if !doc.id.starts_with(&id_prefix) {
         out.push(finding(
             &path,
             &doc.id,
             "id-prefix",
             format!(
-                "id must start with `{REQUIRED_PREFIX}-` (shared library prefix); got `{}`",
+                "id must start with `{prefix}-` (shared library prefix from canonic.toml / --prefix); got `{}`",
                 doc.id
             ),
         ));
@@ -105,18 +103,18 @@ fn check_one(doc: &CannedResponse) -> Vec<CheckFinding> {
     }
 
     match doc.prefix.as_deref() {
-        Some(p) if p == REQUIRED_PREFIX => {}
+        Some(p) if p == prefix => {}
         Some(p) => out.push(finding(
             &path,
             &doc.id,
             "prefix-field",
-            format!("front matter `prefix` must be `{REQUIRED_PREFIX}`; got `{p}`"),
+            format!("front matter `prefix` must be `{prefix}`; got `{p}`"),
         )),
         None => out.push(finding(
             &path,
             &doc.id,
             "prefix-field",
-            format!("front matter `prefix: {REQUIRED_PREFIX}` is required"),
+            format!("front matter `prefix: {prefix}` is required"),
         )),
     }
 
@@ -172,7 +170,6 @@ fn personal_signature_hit(content: &str) -> Option<&'static str> {
     if re.is_match(content) {
         return Some("matched personal closing/name pattern");
     }
-    // Explicit ban of "Regards," followed only by a single first name line that is not the team string
     let lines: Vec<&str> = content.lines().map(|l| l.trim()).collect();
     for w in lines.windows(2) {
         if w[0].eq_ignore_ascii_case("regards,") || w[0].eq_ignore_ascii_case("regards") {
@@ -211,6 +208,7 @@ pub fn format_check_report(report: &CheckReport) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DEFAULT_PREFIX;
     use crate::corpus::CannedResponse;
     use std::path::PathBuf;
 
@@ -228,21 +226,33 @@ mod tests {
     }
 
     #[test]
-    fn accepts_well_formed_resp_response() {
+    fn accepts_well_formed_response() {
         let d = doc(
             "resp-project-space-not-backup",
-            Some("resp"),
+            Some(DEFAULT_PREFIX),
             Some("none"),
             "Hello,\n\nBody.\n\nRegards,\nSupport Team\n",
         );
-        let r = check_responses(&[d]);
+        let r = check_responses(&[d], DEFAULT_PREFIX);
+        assert!(r.ok(), "{:?}", r.findings);
+    }
+
+    #[test]
+    fn honors_custom_prefix() {
+        let d = doc(
+            "acme-topic",
+            Some("acme"),
+            Some("none"),
+            "Hello,\n\nBody.\n\nRegards,\nSupport Team\n",
+        );
+        let r = check_responses(&[d], "acme");
         assert!(r.ok(), "{:?}", r.findings);
     }
 
     #[test]
     fn rejects_missing_prefix_and_bad_id() {
         let d = doc("password-reset", None, None, "Body\n");
-        let r = check_responses(&[d]);
+        let r = check_responses(&[d], DEFAULT_PREFIX);
         let codes: Vec<_> = r.findings.iter().map(|f| f.code.as_str()).collect();
         assert!(codes.contains(&"id-prefix"), "{codes:?}");
         assert!(codes.contains(&"prefix-field"), "{codes:?}");
@@ -253,11 +263,11 @@ mod tests {
     fn rejects_personal_signoff_name_after_regards() {
         let d = doc(
             "resp-foo",
-            Some("resp"),
+            Some(DEFAULT_PREFIX),
             Some("none"),
             "Hello.\n\nRegards,\nAlice\n",
         );
-        let r = check_responses(&[d]);
+        let r = check_responses(&[d], DEFAULT_PREFIX);
         assert!(
             r.findings.iter().any(|f| f.code == "personal-signature"),
             "{:?}",
@@ -267,10 +277,15 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_ids() {
-        let a = doc("resp-a", Some("resp"), Some("none"), "x\n\nRegards,\nSupport Team\n");
+        let a = doc(
+            "resp-a",
+            Some(DEFAULT_PREFIX),
+            Some("none"),
+            "x\n\nRegards,\nSupport Team\n",
+        );
         let mut b = a.clone();
         b.path = PathBuf::from("other/resp-a.md");
-        let r = check_responses(&[a, b]);
+        let r = check_responses(&[a, b], DEFAULT_PREFIX);
         assert!(r.findings.iter().any(|f| f.code == "duplicate-id"));
     }
 }

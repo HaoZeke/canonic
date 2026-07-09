@@ -1,0 +1,3 @@
+# Shared library id prefix. Response files are `{prefix}-{slug}.md` with
+# front matter `prefix: <same>`. Override with `--prefix` or `CANONIC_PREFIX`.
+prefix = "resp"

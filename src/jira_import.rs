@@ -444,15 +444,16 @@ pub fn slugify(title: &str) -> String {
 }
 
 /// Render one issue's comments as a review draft: front matter plus one
-/// section per comment. `id` must already carry the `resp-` prefix.
+/// section per comment. `id` must already carry `{prefix}-`.
 pub fn draft_markdown(
     id: &str,
     issue_key: &str,
     title: &str,
+    prefix: &str,
     comments: &[(String, String, String)],
 ) -> String {
     let mut out = format!(
-        "---\nid: {id}\ntitle: {title}\nprefix: resp\ntags: []\nsop: none\n---\n\n# {title}\n\n<!-- imported from {issue_key}; edit into a real answer, then move to corpus/responses/ -->\n"
+        "---\nid: {id}\ntitle: {title}\nprefix: {prefix}\ntags: []\nsop: none\n---\n\n# {title}\n\n<!-- imported from {issue_key}; edit into a real answer, then move to corpus/responses/ -->\n"
     );
     for (author, created, body_md) in comments {
         out.push_str(&format!(
@@ -473,6 +474,7 @@ pub fn import_jira(
     out_dir: &Path,
     max_results: u32,
     dry_run: bool,
+    prefix: &str,
 ) -> Result<Vec<PathBuf>> {
     let issues = search_all_issues(cfg, jql, max_results)?;
     if !dry_run {
@@ -482,7 +484,8 @@ pub fn import_jira(
     let mut written = Vec::new();
     for issue in issues {
         let id = format!(
-            "resp-{}-{}",
+            "{}-{}-{}",
+            prefix,
             slugify(&issue.summary),
             issue.key.to_lowercase()
         );
@@ -499,7 +502,7 @@ pub fn import_jira(
                 Ok((c.author, c.created, md))
             })
             .collect::<Result<Vec<_>>>()?;
-        let text = draft_markdown(&id, &issue.key, &issue.summary, &rendered);
+        let text = draft_markdown(&id, &issue.key, &issue.summary, prefix, &rendered);
         std::fs::write(&path, text).with_context(|| format!("write {}", path.display()))?;
         written.push(path);
     }
@@ -921,6 +924,7 @@ mod tests {
             "resp-example-hsp-1",
             "HSP-1",
             "Example topic",
+            "resp",
             &[(
                 "Fred F. User".into(),
                 "2026-07-06T18:30:00.000+0000".into(),
