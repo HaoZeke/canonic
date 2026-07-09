@@ -228,13 +228,17 @@ Mapped to **official Atlassian platform REST** (Cloud Free API tokens or Server/
 | `jira-probe` | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud + Server; reports wiki vs ADF write path |
 | `import-jira` | `GET …/search` (api/2, then api/3 + `/search/jql` fallback) · `GET …/issue/{key}/comment` (api/2 then 3) | Free-tier only; no Marketplace apps |
 | `jira-comment` | **Server/DC:** `POST /rest/api/2/issue/{key}/comment` wiki `{"body":"…"}` · **Cloud Free:** `POST /rest/api/3/issue/{key}/comment` minimal **ADF** body | Auto from host (`*.atlassian.net` → ADF) |
-| `doctor` | optional probe when `jira.base_url` set | Non-critical; unset env is fine |
+| `doctor` | optional probe when `[jira]` is configured | Non-critical if unset |
 
 ```bash
-# Probe connectivity + identity
-jira.base_url=https://your-instance.atlassian.net \
-jira.email=you@example.org jira.api_token=... \
-  canonic jira-probe
+# canonic.local.toml (gitignored):
+#   [jira]
+#   base_url = "https://your-instance.atlassian.net"
+#   email = "you@example.org"
+#   api_token = "..."
+#   # auth_header = "Bearer <pat>"   # Server/DC
+
+canonic jira-probe
 
 # Import existing issue comments as review drafts (never auto-writes corpus/responses/)
 canonic import-jira "project = HSP AND labels = canned-response" --dry-run
@@ -249,13 +253,11 @@ canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md 
 canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md
 canonic jira-comment --issue HSP-101 PATH.md --body-format wiki   # force Server/DC
 canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud ADF
-# Server/DC PAT alternative to email+token:
-# export jira.auth_header="Bearer <personal-access-token>"
 ```
 
 - Import reads wiki **or** Cloud ADF comment bodies (ADF flattened to text, then pandoc `jira`→markdown when applicable).
 - Write is **one file → one issue comment**, human-gated — **not bulk library sync**.
-- `canonic doctor` reports free Jira status only when `jira.base_url` is set (probe failure does not fail the critical path).
+- `canonic doctor` reports free Jira status only when `[jira]` is configured (probe failure does not fail the critical path).
 
 Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
 
@@ -298,11 +300,11 @@ Official Atlassian Jira Software (heavy; needs several GB RAM, developer timebom
 ./scripts/jira-fixture/run-import-smoke.sh
 ```
 
-Authentication reads from the environment:
+Authentication is file config under `[jira]` in `canonic.toml` / `canonic.local.toml`:
 
-- `jira.base_url` — required, e.g. `https://your-instance.atlassian.net`.
-- `jira.email` + `jira.api_token` — Basic auth (the Jira Cloud convention).
-- `jira.auth_header` — a raw `Authorization` header instead, e.g. `Bearer <personal-access-token>` for Jira Server/Data Center. Takes precedence over `jira.email`/`jira.api_token` when set.
+- `base_url` — required, e.g. `https://your-instance.atlassian.net`.
+- `email` + `api_token` — Basic auth (Jira Cloud Free convention).
+- `auth_header` — raw `Authorization` header (e.g. `Bearer <pat>` for Server/DC); wins over email/token.
 
 ### Doctor / check exit codes
 
