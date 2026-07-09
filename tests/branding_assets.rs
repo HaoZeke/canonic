@@ -143,21 +143,33 @@ fn landing_page_has_product_ux_structure() {
 }
 
 #[test]
-fn architecture_and_api_pages_ship_visuals_and_rustdoc_link() {
+fn architecture_and_api_pages_ship_visuals_and_embedded_rust_api() {
     let arch = fs::read_to_string(repo_root().join("docs/orgmode/architecture.org")).unwrap();
     assert!(arch.contains("architecture.svg"), "architecture page needs diagram");
     assert!(arch.contains("modules.svg"), "architecture page needs module map");
     let api = fs::read_to_string(repo_root().join("docs/orgmode/api.org")).unwrap();
-    assert!(api.contains("rustdoc/canonic/index.html"), "API page must link shipped rustdoc");
-    assert!(api.contains("cn-mod-grid") || api.contains("Module overview"));
+    assert!(
+        api.contains("sphinxcontrib-rust") || api.contains("sphinxcontrib_rust"),
+        "API page must document sphinxcontrib-rust embed (rgpot pattern)"
+    );
+    assert!(!api.contains("rustdoc/canonic/index.html"), "must not link a side cargo-doc tree");
+    assert!(api.contains("cn-mod-grid") || api.contains("Module map"));
     let arch_svg = static_dir().join("architecture.svg");
     let mod_svg = static_dir().join("modules.svg");
     assert!(arch_svg.is_file() && fs::metadata(&arch_svg).unwrap().len() > 400);
     assert!(mod_svg.is_file() && fs::metadata(&mod_svg).unwrap().len() > 400);
     let build = fs::read_to_string(repo_root().join("docs/build.sh")).unwrap();
-    assert!(build.contains("cargo doc"), "docs build must generate rustdoc");
-    assert!(build.contains("rustdoc"), "docs build copies rustdoc into site output");
+    assert!(
+        build.contains("sphinx-rustdocgen") || build.contains("sphinxcontrib"),
+        "docs build must use sphinx-rustdocgen / sphinxcontrib-rust"
+    );
+    assert!(!build.contains("cargo doc"), "docs build must not ship a separate cargo doc tree");
     let conf = fs::read_to_string(repo_root().join("docs/source/conf.py")).unwrap();
     assert!(conf.contains("dark_code"), "Shibuya dark_code for code UX");
+    assert!(conf.contains("sphinxcontrib_rust"), "conf must enable sphinxcontrib_rust");
+    assert!(conf.contains("rust_crates"), "conf must declare rust_crates");
     assert!(conf.contains("architecture") && conf.contains("api"));
+    let req = fs::read_to_string(repo_root().join("docs/requirements.txt")).unwrap();
+    assert!(req.contains("sphinxcontrib-rust"));
+    assert!(req.contains("sphinx-rustdoc-postprocess"));
 }

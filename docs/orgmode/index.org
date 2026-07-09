@@ -200,7 +200,7 @@ Documentation map
       :link: api
       :link-type: doc
 
-      Module overview and link to cargo-generated rustdoc.
+      Module map and embedded crate reference (sphinxcontrib-rust).
 
 .. toctree::
    :maxdepth: 1

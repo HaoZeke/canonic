@@ -50,7 +50,7 @@ Sphinx + [Shibuya](https://shibuya.lepture.com/) themed HTML lives under `docs/`
 python3 -m http.server -d docs/build 8000
 ```
 
-Prose is authored in **org-mode** under `docs/orgmode/` (same pattern as nimvault/meetrec). `./docs/build.sh` runs Emacs `ox-rst` (`docs/export.el`) to generate untracked `docs/source/*.rst`, installs `docs/requirements.txt` into `.venv-docs` (Sphinx, Shibuya, sphinx-design, sphinx-copybutton), runs `sphinx-build`, then `cargo doc` and copies rustdoc into `docs/build/rustdoc/` (open `docs/build/rustdoc/canonic/index.html` or use the **Rust API** nav link). Branding assets live in `docs/source/_static/` (logos, favicon, mark, architecture/module diagrams). Set `CANONIC_SKIP_RUSTDOC=1` to skip rustdoc; set `CANONIC_SKIP_ORG_EXPORT=1` only if RST is already exported.
+Prose is authored in **org-mode** under `docs/orgmode/` (same pattern as nimvault/meetrec). `./docs/build.sh` runs Emacs `ox-rst` (`docs/export.el`) → untracked `docs/source/*.rst`, installs `docs/requirements.txt` (Sphinx, Shibuya, **sphinxcontrib-rust**, postprocess), and `sphinx-build` embeds the Rust API into the same Shibuya tree via `sphinx-rustdocgen` (rgpot pattern — not a side `cargo doc` tree). Needs `sphinx-rustdocgen` on `PATH` (`cargo install sphinx-rustdocgen`). Branding assets live in `docs/source/_static/`. Set `CANONIC_SKIP_ORG_EXPORT=1` only if RST is already exported.
 
 ## Install
 

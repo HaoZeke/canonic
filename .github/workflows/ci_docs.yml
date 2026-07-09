@@ -22,8 +22,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          # cache sphinx-rustdocgen install as well as the crate
+          cache-targets: true
 
-      - name: Build Sphinx site + rustdoc
+      - name: Install sphinx-rustdocgen
+        run: cargo install sphinx-rustdocgen --locked
+
+      - name: Build Sphinx site (Shibuya + embedded Rust API)
         run: ./docs/build.sh
 
       - name: Upload artifact

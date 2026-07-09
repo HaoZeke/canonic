@@ -35,8 +35,8 @@
 //! surface: convert for paste-in, import only as drafts under
 //! `corpus/imports/`, then [`scaffold::promote_to_corpus`] after review.
 
-#![doc(html_logo_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/mark.svg")]
-#![doc(html_favicon_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/favicon.svg")]
+// Logo/favicon for the site live under docs/source/_static (Shibuya). Do not use
+// #![doc(html_*)] list-form attrs — sphinx-rustdocgen only accepts #[doc = "…"].
 
 pub mod check;
 pub mod config;

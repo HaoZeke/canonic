@@ -23,19 +23,22 @@ Architecture
 Layers
 ------
 
-+------------------+--------------------------------------------------+
-| Layer            | Responsibility                                   |
-+==================+==================================================+
-| Corpus           | ``corpus/responses/resp-*.md`` + front matter   |
-+------------------+--------------------------------------------------+
-| Quality          | ``check`` (prefix/sop/closings), ``lint`` engines|
-+------------------+--------------------------------------------------+
-| Index            | Tantivy BM25 under ``.canonic-index/``           |
-+------------------+--------------------------------------------------+
-| Publish surface  | ``convert`` (pandoc jira) / human paste          |
-+------------------+--------------------------------------------------+
-| Import drafts    | ``import-jira`` → ``corpus/imports/`` only       |
-+------------------+--------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 78
+
+   * - Layer
+     - Responsibility
+   * - Corpus
+     - ``corpus/responses/{prefix}-*.md`` + front matter
+   * - Quality
+     - ``check`` (prefix/sop/closings), ``lint`` engines
+   * - Index
+     - Tantivy BM25 under ``.canonic-index/``
+   * - Publish surface
+     - ``convert`` (pandoc jira) / human paste
+   * - Import drafts
+     - ``import-jira`` → ``corpus/imports/`` only
 
 Library map
 -----------
@@ -48,8 +51,8 @@ The CLI is a thin clap front end over the ``canonic`` library crate:
      <img src="_static/modules.svg" width="720" height="220" alt="canonic library modules" />
    </div>
 
-Full API documentation is generated with **rustdoc** and linked from
-:doc:`api`.
+Full API documentation is generated with **sphinxcontrib-rust** and embedded in
+:doc:`api` (Shibuya pages, not a separate cargo-doc tree).
 
 Free Jira platform map
 ----------------------
