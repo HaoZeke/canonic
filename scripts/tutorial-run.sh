@@ -79,11 +79,22 @@ echo "$CHECK_OUT" | grep -q '0 finding' || {
 }
 
 echo "==> reindex + search"
-# Isolated index dir so parallel tests / concurrent writers do not fight
-# over the repo-local .canonic-index lock.
-INDEX_DIR="${CANONIC_TUTORIAL_INDEX:-$ROOT/.canonic-index-tutorial}"
-mkdir -p "$INDEX_DIR"
-trap '[[ "${CANONIC_TUTORIAL_KEEP_INDEX:-0}" == "1" ]] || rm -rf "$INDEX_DIR"' EXIT
+# Per-run index dir (mktemp) so parallel cargo tests never share a Tantivy lock
+# or delete each other's writer files via EXIT traps.
+if [[ -n "${CANONIC_TUTORIAL_INDEX:-}" ]]; then
+  INDEX_DIR="$CANONIC_TUTORIAL_INDEX"
+  mkdir -p "$INDEX_DIR"
+  CLEAN_INDEX=0
+else
+  INDEX_DIR="$(mktemp -d "${TMPDIR:-/tmp}/canonic-tutorial-index.XXXXXX")"
+  CLEAN_INDEX=1
+fi
+cleanup_index() {
+  if [[ "$CLEAN_INDEX" -eq 1 && -d "$INDEX_DIR" ]]; then
+    rm -rf "$INDEX_DIR"
+  fi
+}
+trap cleanup_index EXIT
 REINDEX_OUT="$("$BIN" reindex --index "$INDEX_DIR")"
 echo "$REINDEX_OUT"
 # Normalize printed path for committed captures
