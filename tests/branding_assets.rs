@@ -113,9 +113,27 @@ fn landing_page_has_product_ux_structure() {
     assert!(index.contains("cn-flow"), "workflow flow strip");
     assert!(index.contains("grid-item-card"), "sphinx-design cards");
     assert!(index.contains("cn-steps"), "numbered first-response steps");
+    assert!(
+        index.contains("cn-step-n") && index.contains("cn-step-title"),
+        "steps must use explicit badges (not CSS counters under labels)"
+    );
+    // Deny the old hardcoded short-form id token without spelling it contiguously here.
+    let banned_short = ["s", "nell"].concat();
+    assert!(
+        !index.to_lowercase().contains(&banned_short),
+        "landing must not hardcode the old cluster short-form prefix"
+    );
+    assert!(
+        index.contains("resp-demo-shared-quota") || index.contains("canonic.toml"),
+        "landing demo path should use the default configured prefix"
+    );
     let css = fs::read_to_string(static_dir().join("custom.css")).unwrap();
     assert!(css.len() > 1500, "custom.css should be a real brand layer");
     assert!(css.contains(".cn-hero") && css.contains(".cn-flow") && css.contains(".cn-btn"));
+    assert!(
+        css.contains(".cn-step-n") && css.contains("list-style: none"),
+        "step CSS must suppress theme list markers and use badge class"
+    );
     let usage = fs::read_to_string(repo_root().join("docs/orgmode/usage.org")).unwrap();
     assert!(usage.contains("cn-page-intro") && usage.contains("cn-cmd-list"));
 }

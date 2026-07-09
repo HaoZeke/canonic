@@ -140,13 +140,34 @@ First canned response
 .. raw:: html
 
    <ol class="cn-steps">
-     <li><strong>Scaffold:</strong> <code>canonic new "Example topic"</code>
-     → <code>corpus/responses/resp-example-topic.md</code> (or edit the shipped demo
-     <code>resp-demo-shared-quota.md</code>).</li>
-     <li><strong>Validate:</strong> <code>canonic check</code></li>
-     <li><strong>Index &amp; search:</strong> <code>canonic reindex</code> then <code>canonic search "example topic"</code></li>
-     <li><strong>Convert</strong> (needs pandoc): <code>canonic convert corpus/responses/resp-example-topic.md</code>
-     (or the shipped <code>resp-demo-shared-quota.md</code> path).</li>
+     <li>
+       <span class="cn-step-n" aria-hidden="true">1</span>
+       <div class="cn-step-body">
+         <span class="cn-step-title">Scaffold</span>
+         <span class="cn-step-desc"><code>canonic new "Example topic"</code> → <code>corpus/responses/resp-example-topic.md</code> (or edit the shipped demo <code>resp-demo-shared-quota.md</code>).</span>
+       </div>
+     </li>
+     <li>
+       <span class="cn-step-n" aria-hidden="true">2</span>
+       <div class="cn-step-body">
+         <span class="cn-step-title">Validate</span>
+         <span class="cn-step-desc"><code>canonic check</code></span>
+       </div>
+     </li>
+     <li>
+       <span class="cn-step-n" aria-hidden="true">3</span>
+       <div class="cn-step-body">
+         <span class="cn-step-title">Index &amp; search</span>
+         <span class="cn-step-desc"><code>canonic reindex</code> then <code>canonic search "example topic"</code></span>
+       </div>
+     </li>
+     <li>
+       <span class="cn-step-n" aria-hidden="true">4</span>
+       <div class="cn-step-body">
+         <span class="cn-step-title">Convert</span>
+         <span class="cn-step-desc">Needs pandoc: <code>canonic convert corpus/responses/resp-demo-shared-quota.md</code></span>
+       </div>
+     </li>
    </ol>
 
 Full command reference: :doc:`usage`.

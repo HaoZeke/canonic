@@ -376,48 +376,76 @@ html.dark .cn-cmd-list li {
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Numbered tutorial steps */
-.cn-steps {
-  counter-reset: cn-step;
-  margin: 0 0 1.5rem;
-  padding: 0;
-  list-style: none;
+/* Numbered tutorial steps (explicit badges — no CSS counters; Shibuya/list
+   markers used to sit on top of the label text). */
+ol.cn-steps {
+  margin: 0 0 1.5rem !important;
+  padding: 0 !important;
+  list-style: none !important;
 }
-.cn-steps > li {
-  position: relative;
-  counter-increment: cn-step;
-  margin: 0 0 0.85rem;
-  padding: 0.95rem 1rem 0.95rem 3.1rem;
+ol.cn-steps > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin: 0 0 0.75rem !important;
+  padding: 0.95rem 1.05rem !important;
   border-radius: 12px;
   background: #fff;
   border: 1px solid #e2e8f0;
+  list-style: none !important;
 }
-html.dark .cn-steps > li {
+html.dark ol.cn-steps > li {
   background: rgba(15, 23, 42, 0.4);
   border-color: #1e293b;
 }
-.cn-steps > li::before {
-  content: counter(cn-step);
-  position: absolute;
-  left: 0.85rem;
-  top: 0.95rem;
+/* Kill theme list markers that overlapped labels (S1fold / V2late). */
+ol.cn-steps > li::before,
+ol.cn-steps > li::marker {
+  content: none !important;
+  display: none !important;
+}
+.cn-step-n {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.7rem;
   height: 1.7rem;
   border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 0.82rem;
   font-weight: 750;
+  line-height: 1;
   background: var(--cn-teal-700);
   color: #ecfdf5;
 }
-html.dark .cn-steps > li::before {
+html.dark .cn-step-n {
   background: var(--cn-teal-500);
   color: #042f2e;
 }
-.cn-steps strong { color: var(--cn-teal-800); }
-html.dark .cn-steps strong { color: var(--cn-teal-100); }
+.cn-step-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.cn-step-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--cn-teal-800);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+}
+html.dark .cn-step-title { color: var(--cn-teal-100); }
+.cn-step-desc {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #334155;
+  word-break: break-word;
+}
+html.dark .cn-step-desc { color: #94a3b8; }
+.cn-step-desc code {
+  font-size: 0.82em;
+}
 
 /* Principle tiles on design page */
 .cn-principles {
