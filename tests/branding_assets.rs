@@ -111,6 +111,10 @@ fn landing_page_has_product_ux_structure() {
     assert!(index.contains("cn-hero"), "landing hero class");
     assert!(index.contains("cn-hero-cta") || index.contains("cn-btn"), "hero CTAs");
     assert!(index.contains("cn-flow"), "workflow flow strip");
+    assert!(
+        index.contains("canonic.toml") || index.contains("{prefix}"),
+        "flow must describe configurable prefix, not a hard-coded short form"
+    );
     assert!(index.contains("grid-item-card"), "sphinx-design cards");
     assert!(index.contains("cn-steps"), "numbered first-response steps");
     assert!(
@@ -129,7 +133,7 @@ fn landing_page_has_product_ux_structure() {
     );
     let css = fs::read_to_string(static_dir().join("custom.css")).unwrap();
     assert!(css.len() > 1500, "custom.css should be a real brand layer");
-    assert!(css.contains(".cn-hero") && css.contains(".cn-flow") && css.contains(".cn-btn"));
+    assert!(css.contains(".cn-hero") && css.contains("ol.cn-flow") && css.contains(".cn-btn"));
     assert!(
         css.contains(".cn-step-n") && css.contains("list-style: none"),
         "step CSS must suppress theme list markers and use badge class"

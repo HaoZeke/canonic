@@ -49,8 +49,8 @@ Workflow at a glance
      <li>
        <span class="cn-flow-n">1</span>
        <span class="cn-flow-title">Author in markdown</span>
-       <span class="cn-flow-desc">Shared configured prefix, front matter, team closing.</span>
-       <span class="cn-flow-cmd">corpus/responses/</span>
+       <span class="cn-flow-desc">Shared prefix from canonic.toml, front matter, team closing.</span>
+       <span class="cn-flow-cmd">{prefix}-*.md</span>
      </li>
      <li>
        <span class="cn-flow-n">2</span>
@@ -88,7 +88,7 @@ What you need → what you run
    .. grid-item-card:: Validate before merge
       :class-card: sd-border-0
 
-      Front matter, ``resp-`` id, and team closings.
+      Front matter, configured prefix id, and team closings.
 
       .. raw:: html
 

@@ -221,30 +221,38 @@ html.dark .cn-btn-ghost {
 
 /* --- Pipeline / flow strip ----------------------------------------------- */
 
-.cn-flow {
+/* Use ol.cn-flow with !important so Shibuya/docutils list markers
+   (the "1." outside the cards) cannot reappear beside cn-flow-n badges. */
+ol.cn-flow {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
-  margin: 0 0 2rem;
-  padding: 0;
-  list-style: none;
+  margin: 0 0 2rem !important;
+  padding: 0 !important;
+  list-style: none !important;
 }
 @media (max-width: 820px) {
-  .cn-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  ol.cn-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .cn-flow { grid-template-columns: 1fr; }
+  ol.cn-flow { grid-template-columns: 1fr; }
 }
-.cn-flow li {
+ol.cn-flow > li {
   position: relative;
-  margin: 0;
-  padding: 0.9rem 0.95rem 0.85rem;
+  margin: 0 !important;
+  padding: 0.9rem 0.95rem 0.85rem !important;
   border-radius: 12px;
   background: var(--cn-teal-50);
   border: 1px solid var(--cn-teal-200);
   min-height: 5.5rem;
+  list-style: none !important;
 }
-html.dark .cn-flow li {
+ol.cn-flow > li::before,
+ol.cn-flow > li::marker {
+  content: none !important;
+  display: none !important;
+}
+html.dark ol.cn-flow > li {
   background: rgba(4, 47, 46, 0.55);
   border-color: var(--cn-teal-800);
 }
