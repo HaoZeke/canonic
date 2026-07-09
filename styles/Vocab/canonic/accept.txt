@@ -34,3 +34,5 @@ PAT
 CLI
 CI
 API
+
+reindex
