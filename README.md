@@ -12,18 +12,18 @@
 
 ## Configuration
 
-Settings are layered with [figment](https://docs.rs/figment) (file-first, no app env vars):
+Settings are layered with [figment](https://docs.rs/figment) (file-first (no application environment variables)):
 
 1. Built-in defaults (`prefix = "resp"`)
 2. `canonic.toml` (walk-up from the working directory)
-3. `canonic.local.toml` beside it (gitignored — tokens / machine overrides)
+3. `canonic.local.toml` beside it (gitignored - tokens / machine overrides)
 4. CLI flags for one-shot overrides (`--config`, `--prefix`)
 
 ```toml
 # canonic.toml
 prefix = "resp"
 
-# Optional free Jira REST — put secrets in canonic.local.toml instead
+# Optional free Jira REST - put secrets in canonic.local.toml instead
 # [jira]
 # base_url = "https://your-instance.atlassian.net"
 # email = "you@example.org"
@@ -50,7 +50,7 @@ Sphinx + [Shibuya](https://shibuya.lepture.com/) themed HTML lives under `docs/`
 python3 -m http.server -d docs/build 8000
 ```
 
-Prose is authored in **org-mode** under `docs/orgmode/` (same pattern as nimvault/meetrec). `./docs/build.sh` runs Emacs `ox-rst` (`docs/export.el`) → untracked `docs/source/*.rst`, installs `docs/requirements.txt` (Sphinx, Shibuya, **sphinxcontrib-rust**, postprocess), and `sphinx-build` embeds the Rust API into the same Shibuya tree via `sphinx-rustdocgen` (rgpot pattern — not a side `cargo doc` tree). Needs `sphinx-rustdocgen` on `PATH` (`cargo install sphinx-rustdocgen`). Branding assets live in `docs/source/_static/`. Set `CANONIC_SKIP_ORG_EXPORT=1` only if RST is already exported.
+Prose is authored in **org-mode** under `docs/orgmode/` (same pattern as nimvault/meetrec). `./docs/build.sh` runs Emacs `ox-rst` (`docs/export.el`) → untracked `docs/source/*.rst`, installs `docs/requirements.txt` (Sphinx, Shibuya, **sphinxcontrib-rust**, postprocess), and `sphinx-build` embeds the Rust API into the same Shibuya tree via `sphinx-rustdocgen` (rgpot pattern - not a side `cargo doc` tree). Needs `sphinx-rustdocgen` on `PATH` (`cargo install sphinx-rustdocgen`). Branding assets live in `docs/source/_static/`. Set `CANONIC_SKIP_ORG_EXPORT=1` only if RST is already exported.
 
 ## Install
 
@@ -72,13 +72,13 @@ cargo build --release
 | Tool | Role |
 |------|------|
 | [Rust](https://rustup.rs/) (1.85+) | Build / install the CLI |
-| [pandoc](https://pandoc.org/) | `convert` — markdown → `jira` writer |
+| [pandoc](https://pandoc.org/) | `convert` - markdown → `jira` writer |
 | [Vale](https://vale.sh/) | optional style lint |
 | Harper | **in-process `harper-core`** (linked); optional CLI on `PATH` |
 
 ## Tutorial: your first canned response
 
-Published answers live under `corpus/responses/` (a seeded sample ships so `list` / `check` / convert work on a clean clone). Prefer the scaffold CLI over hand-copying front matter.
+Published answers live under `corpus/responses/` (a seeded sample includes so `list` / `check` / convert work on a clean clone). Prefer the scaffold CLI over hand-copying front matter.
 
 1. Scaffold a check-clean draft (id = `resp-` + slug of the title):
 
@@ -108,7 +108,7 @@ Published answers live under `corpus/responses/` (a seeded sample ships so `list
    canonic jira-comment --issue HSP-101 corpus/responses/resp-example-topic.md --dry-run
    ```
 
-   A shipped demo also lives at `corpus/responses/resp-demo-shared-quota.md` for
+   An included demo also lives at `corpus/responses/resp-demo-shared-quota.md` for
    `list` / CI without scaffolding first.
 
 **Import → review → promote:** pull existing Jira comments as drafts (never auto-published), edit, then promote:
@@ -155,7 +155,7 @@ sop: none
 
 - `id` and filename stem must match and start with `resp-`
 - `prefix: resp` required (shared library convention; no personal prefixes)
-- `sop:` required — Confluence/service-desk wiki URL, or literal `none` when no SOP page exists yet
+- `sop:` required - Confluence/service-desk wiki URL, or literal `none` when no SOP page exists yet
 - Closings must be team-generic (e.g. `Support Team`), not personal names
 
 `.gitignore` excludes the Tantivy index under `.canonic-index/` and review drafts under `corpus/imports/`.
@@ -164,10 +164,10 @@ sop: none
 
 ```bash
 canonic doctor
-canonic list                           # includes shipped resp-demo-*.md samples
+canonic list                           # includes included resp-demo-*.md samples
 canonic tui                            # interactive ratatui browser
 canonic convert corpus/responses/resp-demo-shared-quota.md
-canonic check                          # quality gate (exit 1 on findings)
+canonic check                          # quality check (exit 1 on findings)
 canonic lint --engine harper           # in-process harper-core (CI uses this)
 
 canonic new "Example topic" --tags example
@@ -188,7 +188,7 @@ canonic promote corpus/imports/resp-some-topic-hsp-101.md
 | `doctor` | Tooling + optional `[jira]` probe |
 | `tui` | Browse / filter / check / convert-preview (never posts to Jira) |
 | `list` / `new` / `promote` | Inventory, scaffold, import→responses after check |
-| `check` / `lint` | Quality gate + Harper (CI uses `--engine harper`) |
+| `check` / `lint` | Quality check + Harper (CI uses `--engine harper`) |
 | `convert` | Markdown → Jira wiki (pandoc) |
 | `reindex` / `search` / `dedupe` | Local Tantivy BM25 + near-duplicates |
 | `jira-probe` / `import-jira` / `jira-comment` | Free platform REST only (no Marketplace apps) |
@@ -209,11 +209,11 @@ canonic tui --corpus corpus/responses
 | `C` | Check whole corpus |
 | `c` | Convert selection → jira wiki **preview** (pandoc) |
 | `l` | Lint selection (harper-core) |
-| `r` / `s` | Reindex / search |
+| `r` / `s` | Rebuild index / search |
 | `R` | Reload from disk |
 | `?` | Help · `q` quit |
 
-The TUI never POSTs to Jira; use `jira-comment` for an explicit one-shot write.
+The TUI never posts to Jira; use `jira-comment` for an explicit one-shot write.
 
 ### Dedupe
 
@@ -226,9 +226,9 @@ Mapped to **official Atlassian platform REST** (Cloud Free API tokens or Server/
 | canonic | Free platform endpoint | Host notes |
 |---------|------------------------|------------|
 | `jira-probe` | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud + Server; reports wiki vs ADF write path |
-| `import-jira` | `GET …/search` (api/2, then api/3 + `/search/jql` fallback) · `GET …/issue/{key}/comment` (api/2 then 3) | Free-tier only; no Marketplace apps |
+| `import-jira` | `GET …/search` (API/2, then API/3 + `/search/jql` fallback) · `GET …/issue/{key}/comment` (API/2 then 3) | Free-tier only; no Marketplace apps |
 | `jira-comment` | **Server/DC:** `POST /rest/api/2/issue/{key}/comment` wiki `{"body":"…"}` · **Cloud Free:** `POST /rest/api/3/issue/{key}/comment` minimal **ADF** body | Auto from host (`*.atlassian.net` → ADF) |
-| `doctor` | optional probe when `[jira]` is configured | Non-critical if unset |
+| `doctor` | optional probe when `[jira]` is configured | Optional when unset |
 
 ```bash
 # canonic.local.toml (gitignored):
@@ -256,18 +256,18 @@ canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud 
 ```
 
 - Import reads wiki **or** Cloud ADF comment bodies (ADF flattened to text, then pandoc `jira`→markdown when applicable).
-- Write is **one file → one issue comment**, human-gated — **not bulk library sync**.
+- Write is **one file → one issue comment**, human-gated - **not bulk library sync**.
 - `canonic doctor` reports free Jira status only when `[jira]` is configured (probe failure does not fail the critical path).
 
-Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
+Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers, - never production credentials.
 
-**Live smoke (official Atlassian Jira Software):** host with podman/docker and a few GB free RAM:
+**Live smoke (official Atlassian Jira Software):** host with podman/docker and a few gigabytes of free RAM:
 
 ```bash
 ./scripts/jira-real/run-import-smoke.sh
 ```
 
-Pulls `atlassian/jira-software:9.12.15`, classic-setup with Atlassian’s published short-lived **developer timebomb** license (Server/Data Center is trial/paid; the key is for local testing only), seeds `HSP` issues with `canned-response` labels and wiki-markup comments, runs `canonic import-jira`, then removes the container/volume.
+Pulls `atlassian/jira-software:9.12.15`, classic-setup with Atlassian’s published short-lived **developer time-bomb** license (Server/Data Center is trial/paid; the key is for local testing only), seeds `HSP` issues with `canned-response` labels and wiki-markup comments, runs `canonic import-jira`, then removes the container/volume.
 
 
 ### Jira smoke tests (Docker / Nix)
@@ -288,7 +288,7 @@ docker load < result
 ./scripts/ci/jira-docker-smoke.sh
 ```
 
-Official Atlassian Jira Software (heavy; needs several GB RAM, developer timebomb license):
+Official Atlassian Jira Software (heavy; needs several gigabytes of RAM, developer time-bomb license):
 
 ```bash
 ./scripts/jira-real/run-import-smoke.sh
@@ -302,9 +302,9 @@ Official Atlassian Jira Software (heavy; needs several GB RAM, developer timebom
 
 Authentication is file config under `[jira]` in `canonic.toml` / `canonic.local.toml`:
 
-- `base_url` — required, e.g. `https://your-instance.atlassian.net`.
-- `email` + `api_token` — Basic auth (Jira Cloud Free convention).
-- `auth_header` — raw `Authorization` header (e.g. `Bearer <pat>` for Server/DC); wins over email/token.
+- `base_url` - required, e.g. `https://your-instance.atlassian.net`.
+- `email` + `api_token` - Basic auth (Jira Cloud Free convention).
+- `auth_header` - raw `Authorization` header (e.g. `Bearer <pat>` for Server/DC); wins over email/token.
 
 ### Doctor / check exit codes
 
@@ -325,7 +325,7 @@ Pass a branch name as the first argument to override the current branch.
 
 - **Tantivy BM25** for search and near-duplicate discovery (better fit for curation/dedupe than a hand-rolled store).
 - Markdown remains the source of truth; Jira is a publication surface. `canonic convert` produces the wiki markup for a human to paste in; `canonic import-jira` reads existing issue comments back out as drafts. Neither direction writes to Jira automatically.
-- Quality checks implement the meeting rule: **review before migration**, shared configured prefix prefix only.
+- Quality checks implement the meeting rule: **review before migration**, shared configured prefix only.
 
 ## Citation
 
@@ -333,4 +333,4 @@ See `CITATION.cff`, or use GitHub's "Cite this repository" button.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT - see `LICENSE`.

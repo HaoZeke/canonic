@@ -6,7 +6,7 @@
 .. raw:: html
 
    <div class="cn-hero">
-     <p class="cn-hero-eyebrow">markdown corpus · Jira convert · quality gates</p>
+     <p class="cn-hero-eyebrow">markdown corpus · Jira convert · quality checks</p>
      <div class="cn-hero-brand">
        <img class="cn-hero-mark" src="_static/mark.svg" width="60" height="60" alt="" />
        <div>
@@ -16,7 +16,7 @@
      </div>
      <img class="cn-hero-logo cn-hero-logo-light" src="_static/logo.svg" width="320" height="60" alt="canonic" />
      <img class="cn-hero-logo cn-hero-logo-dark" src="_static/logo-dark.svg" width="320" height="60" alt="canonic" />
-     <p class="cn-hero-tagline">Versioned canned-response corpus for Jira workflows — markdown under a shared configured prefix is the source of truth. Convert with pandoc, gate with quality checks, search and dedupe with Tantivy.</p>
+     <p class="cn-hero-tagline">Versioned canned-response corpus for Jira workflows - markdown under a shared configured prefix is the source of truth. Convert with pandoc, gate with quality checks, search and dedupe with Tantivy.</p>
      <div class="cn-hero-pills">
        <span>markdown corpus</span>
        <span>shared prefix</span>
@@ -54,8 +54,8 @@ Workflow at a glance
      </li>
      <li>
        <span class="cn-flow-n">2</span>
-       <span class="cn-flow-title">Gate quality</span>
-       <span class="cn-flow-desc">Ids, prefix, sop, and generic closings — fail the PR early.</span>
+       <span class="cn-flow-title">Check quality</span>
+       <span class="cn-flow-desc">Ids, prefix, sop, and generic closings - fail the PR early.</span>
        <span class="cn-flow-cmd">canonic check</span>
      </li>
      <li>
@@ -76,7 +76,7 @@ Workflow at a glance
 
    <div class="cn-figure">
      <img src="_static/architecture.svg" width="840" height="280" alt="canonic architecture pipeline" />
-     <p class="cn-figure-caption">Full pipeline diagram — details in <a href="architecture.html">Architecture</a>.</p>
+     <p class="cn-figure-caption">Full pipeline diagram - details in <a href="architecture.html">Architecture</a>.</p>
    </div>
 
 What you need → what you run
@@ -144,7 +144,7 @@ First canned response
        <span class="cn-step-n" aria-hidden="true">1</span>
        <div class="cn-step-body">
          <span class="cn-step-title">Scaffold</span>
-         <span class="cn-step-desc"><code>canonic new "Example topic"</code> → <code>corpus/responses/resp-example-topic.md</code> (or edit the shipped demo <code>resp-demo-shared-quota.md</code>).</span>
+         <span class="cn-step-desc"><code>canonic new "Example topic"</code> → <code>corpus/responses/resp-example-topic.md</code> (or edit the included demo <code>resp-demo-shared-quota.md</code>).</span>
        </div>
      </li>
      <li>
@@ -216,7 +216,7 @@ Source & license
 ================
 
 - Repository: https://github.com/HaoZeke/canonic
-- License: MIT — see ``LICENSE``
+- License: MIT - see ``LICENSE``
 - Site theme: `Shibuya <https://shibuya.lepture.com/>`_ (build with ``./docs/build.sh``)
 
 #+end_export

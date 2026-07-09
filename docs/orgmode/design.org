@@ -25,12 +25,12 @@ Design notes
      <li>
        <h3>Tantivy BM25 for curation</h3>
        <p>Search and near-duplicate discovery fit a local inverted index better
-       than a hand-rolled store — with Jaccard as a second opinion on pairs.</p>
+       than a hand-rolled store - with Jaccard as a second opinion on pairs.</p>
      </li>
      <li>
        <h3>Review before migrate</h3>
        <p>Quality checks encode the meeting rule: shared configured prefix only,
-       valid front matter, team-generic closings — gate the library before Jira.
+       valid front matter, team-generic closings - check the library before Jira.
        CI runs <code>check</code> and in-process Harper on published responses.</p>
      </li>
    </ul>
@@ -53,7 +53,7 @@ See ``CITATION.cff``, or use GitHub's "Cite this repository" button.
 License
 -------
 
-MIT — see ``LICENSE`` in the repository root.
+MIT - see ``LICENSE`` in the repository root.
 
 Building this site
 ------------------

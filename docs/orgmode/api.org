@@ -22,7 +22,7 @@ Module map
    <ul class="cn-mod-grid">
      <li><code>config</code><p><code>canonic.toml</code> / CLI prefix and optional <code>[jira]</code> settings.</p></li>
      <li><code>corpus</code><p>Walk and load <code>{prefix}-*.md</code> responses with front matter.</p></li>
-     <li><code>check</code><p>Quality gate: prefix, sop, ids, team-generic closings.</p></li>
+     <li><code>check</code><p>Quality check: prefix, sop, ids, team-generic closings.</p></li>
      <li><code>convert</code><p>Pandoc markdown ↔ Jira wiki markup.</p></li>
      <li><code>index</code><p>Tantivy reindex, BM25 search, near-duplicate pairs.</p></li>
      <li><code>lint</code><p>Vale CLI and in-process Harper grammar checks.</p></li>
@@ -36,7 +36,7 @@ Module map
 
    <div class="cn-figure">
      <img src="_static/modules.svg" width="720" height="220" alt="crate canonic module map" />
-     <p class="cn-figure-caption">Public modules re-exported from <code>canonic::</code> — full signatures in the generated reference below.</p>
+     <p class="cn-figure-caption">Public modules re-exported from <code>canonic::</code> - full signatures in the generated reference below.</p>
    </div>
 
 Building the site
@@ -46,7 +46,7 @@ Building the site
 
    # needs emacs (org export), Python venv deps, and sphinx-rustdocgen (cargo install)
    ./docs/build.sh
-   # open docs/build/index.html — Rust API is under docs/build/api.html and crates/
+   # open docs/build/index.html - Rust API is under docs/build/api.html and crates/
 
 # sphinx-rustdoc-postprocess injects the crate toctree here at build time.
 

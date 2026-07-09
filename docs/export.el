@@ -1,7 +1,16 @@
 ;; Setup Package Manager (to fetch ox-rst automatically)
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+(add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
 (package-initialize)
+
+;; Ubuntu emacs-nox ships an older Org that lacks helpers MELPA ox-rst needs
+;; (e.g. org-element-type-p). Install current Org from GNU ELPA first.
+(unless (package-installed-p 'org)
+  (package-refresh-contents)
+  (package-install 'org))
+;; Prefer ELPA Org over the bundled one.
+(require 'org)
 
 ;; Ensure ox-rst is present
 (unless (package-installed-p 'ox-rst)

@@ -10,9 +10,9 @@ Usage
 
    <div class="cn-page-intro">
      <p>Day-to-day workflow for the shared <code>resp-</code> corpus: scaffold and
-     edit responses, quality-gate in CI, browse with the TUI, convert with
+     edit responses, quality check in CI, browse with the TUI, convert with
      pandoc, and use free-tier Jira REST only for explicit probe / import /
-     one-shot comment — never unattended bulk sync into Jira.</p>
+     one-shot comment - never unattended bulk sync into Jira.</p>
    </div>
 
 Quick start
@@ -73,7 +73,7 @@ Command reference
      - Purpose
      - Notes
    * - ``doctor``
-     - Probe pandoc, Vale, Harper, optional Jira env
+     - Probe pandoc, Vale, Harper, optional [jira] config
      - Exit ``1`` if pandoc missing
    * - ``tui``
      - Interactive corpus browser
@@ -88,7 +88,7 @@ Command reference
      - Copy import draft → ``corpus/responses/``
      - Runs quality check first; refuses dirty drafts
    * - ``check``
-     - Quality gate (prefix, sop, team sign-off)
+     - Quality check (prefix, sop, team sign-off)
      - Exit ``1`` on findings; ``--json``
    * - ``lint``
      - Vale and/or Harper
@@ -130,7 +130,7 @@ Command map (cards)
            <li>canonic doctor<span class="cn-cmd-hint">pandoc / tooling status</span></li>
            <li>canonic tui<span class="cn-cmd-hint">interactive browser</span></li>
            <li>canonic list<span class="cn-cmd-hint">list response files</span></li>
-           <li>canonic check<span class="cn-cmd-hint">quality gate · exit 1 on findings</span></li>
+           <li>canonic check<span class="cn-cmd-hint">quality check · exit 1 on findings</span></li>
            <li>canonic lint --engine harper</li>
          </ul>
 
@@ -206,7 +206,7 @@ Interactive TUI
 
 .. important::
 
-   The TUI **never** POSTs to Jira. Convert preview stays local. Publishing is
+   The TUI **never** posts to Jira. Convert preview stays local. Publishing is
    always an explicit ``canonic jira-comment`` (or human paste of ``convert``
    output).
 
@@ -275,7 +275,7 @@ Full paste-ready session
 
    canonic doctor
    canonic list
-   # shipped demo (no scaffold required):
+   # included demo (no scaffold required):
    canonic convert corpus/responses/resp-demo-shared-quota.md
    canonic check
    canonic lint --engine harper
@@ -320,7 +320,7 @@ Front matter is enforced by ``canonic check``:
 
    - ``id`` and filename stem must match and start with ``resp-``
    - ``prefix: resp`` required (shared library convention; no personal prefixes)
-   - ``sop:`` required — Confluence / service-desk wiki URL, or the literal
+   - ``sop:`` required - Confluence / service-desk wiki URL, or the literal
      ``none`` when no SOP page exists yet
    - Closings must be team-generic (e.g. ``Support Team``), not personal names
 
@@ -341,7 +341,7 @@ elsewhere, mirror a branch:
 Open the merge request on that GitLab. Do **not** bulk-push the library into
 Jira; only ``convert`` paste or explicit ``jira-comment`` publish one answer.
 
-CI quality gate
+CI quality check
 ---------------
 
 GitHub Actions runs ``cargo test --locked --all-targets``, then on the release
@@ -383,7 +383,7 @@ available). Exit non-zero on auth or reachability failure.
 
 ``import-jira <jql>`` searches free search paths (api/2 then api/3 variants),
 fetches comments, converts wiki/ADF → markdown, and writes **one draft per
-issue** under ``corpus/imports/`` — never into ``corpus/responses/``.
+issue** under ``corpus/imports/`` - never into ``corpus/responses/``.
 ``--dry-run`` lists targets without fetching comments.
 
 **Comment write (explicit)**
@@ -393,17 +393,17 @@ issue** under ``corpus/imports/`` — never into ``corpus/responses/``.
 
 - Server/DC: ``POST /rest/api/2/issue/{key}/comment`` with wiki string body
 - Cloud Free (``*.atlassian.net``): ``POST /rest/api/3/issue/{key}/comment`` with
-  minimal **ADF** — required by Cloud v3, no paid apps
+  minimal **ADF** - required by Cloud v3, no paid apps
 
 ``--body-format auto|wiki|adf`` overrides host detection. ``--dry-run`` prints the
-converted wiki without POSTing. One file, one issue, human-gated — not bulk sync.
+converted wiki without POSTing. One file, one issue, human-gated - not bulk sync.
 
 **Official free map (platform only)**
 
 +------------------+----------------------------------------------+------------------+
 | Command          | Endpoint                                     | Body             |
 +==================+==============================================+==================+
-| ``jira-probe``   | ``GET /rest/api/2/myself``                   | —                |
+| ``jira-probe``   | ``GET /rest/api/2/myself``                   | -                |
 +------------------+----------------------------------------------+------------------+
 | ``import-jira``  | ``GET …/search`` + comments (v2/v3 fallback) | wiki or ADF read |
 +------------------+----------------------------------------------+------------------+

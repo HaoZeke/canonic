@@ -10,7 +10,7 @@ Architecture
 
    <div class="cn-page-intro">
      <p>Markdown under a shared configured prefix is the only source of truth.
-     Quality gates and a local Tantivy index sit in front of Jira publication.</p>
+     Quality checks and a local Tantivy index sit in front of Jira publication.</p>
    </div>
 
 .. raw:: html
@@ -58,7 +58,7 @@ Free Jira platform map
 ----------------------
 
 canonic uses only **native** Jira REST (Cloud Free API tokens or Server/DC
-PAT) — no Marketplace apps:
+PAT) - no Marketplace apps:
 
 .. list-table::
    :header-rows: 1
