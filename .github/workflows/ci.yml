@@ -48,6 +48,9 @@ jobs:
           test -n "$out"
           echo "$out" | head -n 5
 
+      - name: Tutorial path (One Good Tutorial)
+        run: ./scripts/tutorial-run.sh ./target/release/canonic
+
       - name: Public leak scan (zero org branding)
         run: cargo test --locked --test public_leak_scan
 

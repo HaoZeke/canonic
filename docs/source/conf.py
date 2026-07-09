@@ -75,6 +75,7 @@ html_theme_options = {
     "dark_code": True,
     "globaltoc_expand_depth": 1,
     "nav_links": [
+        {"title": "Tutorial", "url": "tutorial"},
         {"title": "Usage", "url": "usage"},
         {"title": "Design", "url": "design"},
         {"title": "Architecture", "url": "architecture"},

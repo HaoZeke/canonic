@@ -37,6 +37,15 @@ canonic --prefix acme new "Topic title"   # one-shot prefix override
 canonic --config /path/to/canonic.toml jira-probe
 ```
 
+## Tutorial
+
+Walk the included demos from list through convert: **[docs/orgmode/tutorial.org](docs/orgmode/tutorial.org)** (HTML: [Tutorial](https://canonic.rgoswami.me/tutorial.html)). Reproduce with:
+
+```bash
+cargo build --release --locked
+./scripts/tutorial-run.sh ./target/release/canonic
+```
+
 ## Docs site (Shibuya)
 
 Live site: **https://canonic.rgoswami.me** (Cloudflare Pages + Antics).

@@ -1,0 +1,140 @@
+#+TITLE: Tutorial
+#+AUTHOR: [[https://rgoswami.me][Rohit Goswami]]
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil ^:nil
+
+#+begin_export rst
+Tutorial
+========
+
+In this tutorial you take the included demo corpus from a checkout to a
+Jira-ready wiki snippet. Here is the end result after the steps below:
+
+.. code:: text
+
+   $ canonic list
+   resp-demo-shared-quota	Demo - shared project quota	sop=none	corpus/responses/resp-demo-shared-quota.md
+   resp-demo-software-request	Demo - how to request software	sop=none	corpus/responses/resp-demo-software-request.md
+
+   $ canonic check
+   check: 2 file(s), 0 finding(s)
+   All quality checks passed.
+
+   $ canonic reindex && canonic search "shared quota" -n 1
+   reindexed 2 document(s) into .canonic-index/
+   1. resp-demo-shared-quota  score=...  Demo - shared project quota
+      corpus/responses/resp-demo-shared-quota.md
+      ...
+
+   $ canonic convert corpus/responses/resp-demo-shared-quota.md
+   h1. Demo - shared project quota
+   ...
+   Regards,
+   Support Team
+
+Markdown under ``corpus/responses/`` is the source of truth. Jira is only a
+paste or one-shot comment target. For flags, TUI keys, and free REST details see
+:doc:`usage`.
+
+Install or use a checkout
+-------------------------
+
+From a clone of this repository (the sample corpus is already present):
+
+.. code:: shell
+
+   git clone https://github.com/HaoZeke/canonic.git
+   cd canonic
+   cargo build --release --locked
+   export PATH="$PWD/target/release:$PATH"
+   canonic --version
+
+Or install the binary without a local corpus and then clone for the demos:
+
+.. code:: shell
+
+   cargo install --git https://github.com/HaoZeke/canonic --locked
+   # still use a checkout of this repo for corpus/responses/resp-demo-*.md
+
+Confirm tooling:
+
+.. code:: shell
+
+   canonic doctor
+   # pandoc: ok | MISSING  (convert needs pandoc; other steps do not)
+
+List the demo corpus
+--------------------
+
+From the repository root:
+
+.. code:: shell
+
+   canonic list
+
+You should see two published demos, including
+``resp-demo-shared-quota`` and ``resp-demo-software-request``. The shared id
+prefix comes from ``canonic.toml`` (default ``resp``).
+
+Quality check
+-------------
+
+.. code:: shell
+
+   canonic check
+
+A clean corpus prints zero findings and exits 0. CI runs the same gate on
+``corpus/responses/``.
+
+Search the library
+------------------
+
+.. code:: shell
+
+   canonic reindex
+   canonic search "shared quota"
+
+The first hit should be the shared-quota demo. Near-duplicate discovery is the
+same index with ``canonic dedupe`` (see :doc:`usage`).
+
+Convert to Jira wiki (pandoc)
+-----------------------------
+
+When ``canonic doctor`` reports pandoc:
+
+.. code:: shell
+
+   canonic convert corpus/responses/resp-demo-shared-quota.md
+
+Paste the wiki markup into a ticket, or use explicit one-shot posting later
+(``canonic jira-comment`` with ``[jira]`` in ``canonic.local.toml``). Without
+pandoc, stop after search; convert is optional for this tutorial.
+
+Scaffold your own response (optional next step)
+-----------------------------------------------
+
+Still in the same checkout:
+
+.. code:: shell
+
+   canonic new "Example topic" --tags example
+   # → corpus/responses/resp-example-topic.md
+   $EDITOR corpus/responses/resp-example-topic.md
+   canonic check
+   canonic convert corpus/responses/resp-example-topic.md
+
+Do not invent a second workflow. For import → promote, free Jira probe, and the
+TUI, open :doc:`usage`. Design notes: :doc:`design`. Architecture: :doc:`architecture`.
+
+Reproduce this tutorial automatically
+-------------------------------------
+
+.. code:: shell
+
+   cargo build --release --locked
+   ./scripts/tutorial-run.sh ./target/release/canonic
+
+The script drives the real binary against the included demos and exits non-zero
+if list, check, reindex, or search fail. Convert is asserted only when pandoc is
+on ``PATH``.
+
+#+end_export

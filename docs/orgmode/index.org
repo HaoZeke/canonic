@@ -25,7 +25,8 @@
        <span>review before migrate</span>
      </div>
      <div class="cn-hero-cta">
-       <a class="cn-btn cn-btn-primary" href="usage.html">Usage &amp; CLI</a>
+       <a class="cn-btn cn-btn-primary" href="tutorial.html">Tutorial</a>
+       <a class="cn-btn cn-btn-ghost" href="usage.html">Usage and CLI</a>
        <a class="cn-btn cn-btn-ghost" href="design.html">Design notes</a>
        <a class="cn-btn cn-btn-ghost" href="https://github.com/HaoZeke/canonic">GitHub</a>
      </div>
@@ -170,13 +171,19 @@ First canned response
      </li>
    </ol>
 
-Full command reference: :doc:`usage`.
+Walk the demos end-to-end: :doc:`tutorial`. Full command reference: :doc:`usage`.
 
 Documentation map
 =================
 
 .. grid:: 1 2 2 2
    :gutter: 2
+
+   .. grid-item-card:: Tutorial
+      :link: tutorial
+      :link-type: doc
+
+      One path from checkout to convert using the included demos.
 
    .. grid-item-card:: Usage
       :link: usage
@@ -207,6 +214,7 @@ Documentation map
    :caption: Guides
    :hidden:
 
+   tutorial
    usage
    design
    architecture
