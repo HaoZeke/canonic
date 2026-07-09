@@ -20,8 +20,13 @@ fn tutorial_org_is_one_good_path() {
     let root = repo_root();
     let org = fs::read_to_string(root.join("docs/orgmode/tutorial.org")).expect("tutorial.org");
     assert!(
-        org.contains("Here is the end result") || org.contains("end result"),
+        org.contains("end result") || org.contains("literalinclude"),
         "tutorial must show the outcome early"
+    );
+    assert!(
+        org.contains("_generated/tutorial-session.txt")
+            || org.contains("literalinclude:: _generated/tutorial-session.txt"),
+        "tutorial end-state must literalinclude measured session capture"
     );
     for cmd in [
         "canonic list",
@@ -31,7 +36,10 @@ fn tutorial_org_is_one_good_path() {
         "canonic convert",
         "canonic doctor",
     ] {
-        assert!(org.contains(cmd), "tutorial missing command: {cmd}");
+        assert!(
+            org.contains(cmd) || org.contains("--capture"),
+            "tutorial missing command: {cmd}"
+        );
     }
     assert!(
         org.contains("resp-demo-shared-quota"),
@@ -83,7 +91,43 @@ fn tutorial_org_is_one_good_path() {
 }
 
 #[test]
+fn tutorial_capture_writes_measured_session() {
+    let root = repo_root();
+    let script = root.join("scripts/tutorial-run.sh");
+    let bin = bin();
+    let out = Command::new(&script)
+        .args(["--capture", bin.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .expect("tutorial-run --capture");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "capture failed\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    let session = root.join("docs/source/_generated/tutorial-session.txt");
+    assert!(session.is_file(), "missing {session:?}");
+    let body = fs::read_to_string(&session).unwrap();
+    assert!(body.contains("$ canonic list"), "session missing list header: {body}");
+    assert!(
+        body.contains("resp-demo-shared-quota"),
+        "session missing demo id: {body}"
+    );
+    assert!(body.contains("$ canonic check"), "session missing check");
+    assert!(body.contains("0 finding"), "session check not clean: {body}");
+    assert!(
+        body.contains("shared quota") || body.contains("resp-demo-shared-quota"),
+        "session missing search/demo content"
+    );
+    // committed session must stay present for Sphinx without a binary
+    let org = fs::read_to_string(root.join("docs/orgmode/tutorial.org")).unwrap();
+    assert!(org.contains("_generated/tutorial-session.txt"));
+}
+
+#[test]
 fn tutorial_run_script_drives_real_binary() {
+
     let root = repo_root();
     let script = root.join("scripts/tutorial-run.sh");
     let bin = bin();

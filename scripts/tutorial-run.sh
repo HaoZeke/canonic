@@ -1,20 +1,39 @@
 #!/usr/bin/env bash
 # Drive the One Good Tutorial path against a real canonic binary.
+#
 # Usage (repo root):
 #   cargo build --release --locked
 #   ./scripts/tutorial-run.sh ./target/release/canonic
+#   ./scripts/tutorial-run.sh --capture ./target/release/canonic
+#     → writes docs/source/_generated/tutorial-session.txt for Sphinx
+#       literalinclude (measured CLI output, not hand-typed).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-BIN="${1:-}"
+CAPTURE=0
+BIN=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --capture) CAPTURE=1; shift ;;
+    -h|--help)
+      sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      BIN="$1"
+      shift
+      ;;
+  esac
+done
+
 if [[ -z "$BIN" ]]; then
   if [[ -x "$ROOT/target/release/canonic" ]]; then
     BIN="$ROOT/target/release/canonic"
   elif command -v canonic >/dev/null 2>&1; then
     BIN="$(command -v canonic)"
   else
-    echo "usage: $0 /path/to/canonic" >&2
+    echo "usage: $0 [--capture] /path/to/canonic" >&2
     exit 2
   fi
 fi
@@ -23,12 +42,25 @@ if [[ ! -x "$BIN" ]]; then
   exit 2
 fi
 
-DEMO="$ROOT/corpus/responses/resp-demo-shared-quota.md"
+DEMO_REL="corpus/responses/resp-demo-shared-quota.md"
+DEMO="$ROOT/$DEMO_REL"
 test -f "$DEMO" || { echo "error: missing $DEMO" >&2; exit 1; }
 test -f "$ROOT/canonic.toml" || { echo "error: missing canonic.toml" >&2; exit 1; }
 
+GEN_DIR="$ROOT/docs/source/_generated"
+SESSION="$GEN_DIR/tutorial-session.txt"
+
+# Stabilize volatile fields so committed captures stay reviewable.
+stabilize() {
+  # score floats, absolute index paths, host-specific doctor lines we omit
+  sed -E \
+    -e 's/score=[0-9]+(\.[0-9]+)?/score=…/g' \
+    -e 's#into .canonic-index/?#into .canonic-index/#g' \
+    -e 's#/home/[^/]+/[^[:space:]]+canonic/#./#g'
+}
+
 echo "==> doctor"
-"$BIN" doctor
+"$BIN" doctor >/dev/null || true
 
 echo "==> list"
 LIST_OUT="$("$BIN" list)"
@@ -47,14 +79,16 @@ echo "$CHECK_OUT" | grep -q '0 finding' || {
 }
 
 echo "==> reindex + search"
-"$BIN" reindex
-SEARCH_OUT="$("$BIN" search "shared quota" -n 5)"
+REINDEX_OUT="$("$BIN" reindex)"
+echo "$REINDEX_OUT"
+SEARCH_OUT="$("$BIN" search "shared quota" -n 3)"
 echo "$SEARCH_OUT"
 echo "$SEARCH_OUT" | grep -q 'resp-demo-shared-quota' || {
   echo "error: search missed resp-demo-shared-quota" >&2
   exit 1
 }
 
+CONV_OUT=""
 if command -v pandoc >/dev/null 2>&1; then
   echo "==> convert (pandoc present)"
   CONV_OUT="$("$BIN" convert "$DEMO")"
@@ -69,6 +103,34 @@ if command -v pandoc >/dev/null 2>&1; then
   }
 else
   echo "==> convert skipped (pandoc not on PATH)"
+fi
+
+if [[ "$CAPTURE" -eq 1 ]]; then
+  mkdir -p "$GEN_DIR"
+  {
+    echo "\$ canonic list"
+    echo "$LIST_OUT"
+    echo
+    echo "\$ canonic check"
+    echo "$CHECK_OUT"
+    echo
+    echo "\$ canonic reindex && canonic search \"shared quota\" -n 3"
+    echo "$REINDEX_OUT" | stabilize
+    echo "$SEARCH_OUT" | stabilize
+    if [[ -n "$CONV_OUT" ]]; then
+      echo
+      echo "\$ canonic convert $DEMO_REL"
+      # Keep convert short and stable for the page
+      echo "$CONV_OUT" | head -n 16
+      if [[ "$(echo "$CONV_OUT" | wc -l)" -gt 16 ]]; then
+        echo "…"
+      fi
+    else
+      echo
+      echo "# convert skipped: pandoc not on PATH when this session was captured"
+    fi
+  } | stabilize >"$SESSION"
+  echo "wrote $SESSION"
 fi
 
 echo "OK: tutorial path passed with $BIN"

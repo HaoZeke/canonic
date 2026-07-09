@@ -52,6 +52,19 @@ if ! command -v sphinx-rustdocgen >/dev/null 2>&1; then
   cargo install sphinx-rustdocgen --locked
 fi
 
+
+# Optional: refresh measured tutorial transcript when a release binary is present
+# (or set CANONIC_REFRESH_TUTORIAL=1 to require it).
+if [[ "${CANONIC_REFRESH_TUTORIAL:-0}" == "1" ]] || [[ -x "$ROOT/target/release/canonic" ]]; then
+  if [[ -x "$ROOT/target/release/canonic" ]]; then
+    echo "==> refresh tutorial session capture"
+    "$ROOT/scripts/tutorial-run.sh" --capture "$ROOT/target/release/canonic" >/dev/null
+  elif [[ "${CANONIC_REFRESH_TUTORIAL:-0}" == "1" ]]; then
+    echo "error: CANONIC_REFRESH_TUTORIAL=1 but target/release/canonic missing" >&2
+    exit 1
+  fi
+fi
+
 echo "==> 2/3 sphinx-build (Shibuya + embedded Rust API) → $BUILD"
 rm -rf "$BUILD"
 # sphinxcontrib-rust regenerates docs/source/crates/ during this step

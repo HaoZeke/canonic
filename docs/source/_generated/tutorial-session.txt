@@ -1,0 +1,25 @@
+$ canonic list
+resp-demo-shared-quota	Demo - shared project quota	sop=none	corpus/responses/resp-demo-shared-quota.md
+resp-demo-software-request	Demo - how to request software	sop=none	corpus/responses/resp-demo-software-request.md
+
+$ canonic check
+check: 2 file(s), 0 finding(s)
+All quality checks passed.
+
+$ canonic reindex && canonic search "shared quota" -n 3
+reindexed 2 document(s) into .canonic-index/
+1. resp-demo-shared-quota  score=…  Demo - shared project quota
+   corpus/responses/resp-demo-shared-quota.md
+   # Demo - shared project quota  Hello,  This is a **demo** canned response for the canonic public sample corpus. Treat pr...
+
+$ canonic convert corpus/responses/resp-demo-shared-quota.md
+h1. {anchor:demo---shared-project-quota}Demo - shared project quota
+Hello,
+
+This is a *demo* canned response for the canonic public sample corpus. Treat project storage as shared working space for active data, not as long-term archive.
+
+* Keep only current working sets on the shared volume.
+* Move durable copies to your documented archive tier when you need retention.
+* Free unused data so others on the project keep quota headroom.
+
+Regards, Support Team

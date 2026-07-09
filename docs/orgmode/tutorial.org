@@ -7,29 +7,12 @@ Tutorial
 ========
 
 In this tutorial you take the included demo corpus from a checkout to a
-Jira-ready wiki snippet. Here is the end result after the steps below:
+Jira-ready wiki snippet. Here is the end result after the steps below
+(captured from a real binary via ``./scripts/tutorial-run.sh --capture``;
+regenerate that file when CLI output changes):
 
-.. code:: text
-
-   $ canonic list
-   resp-demo-shared-quota	Demo - shared project quota	sop=none	corpus/responses/resp-demo-shared-quota.md
-   resp-demo-software-request	Demo - how to request software	sop=none	corpus/responses/resp-demo-software-request.md
-
-   $ canonic check
-   check: 2 file(s), 0 finding(s)
-   All quality checks passed.
-
-   $ canonic reindex && canonic search "shared quota" -n 1
-   reindexed 2 document(s) into .canonic-index/
-   1. resp-demo-shared-quota  score=...  Demo - shared project quota
-      corpus/responses/resp-demo-shared-quota.md
-      ...
-
-   $ canonic convert corpus/responses/resp-demo-shared-quota.md
-   h1. Demo - shared project quota
-   ...
-   Regards,
-   Support Team
+.. literalinclude:: _generated/tutorial-session.txt
+   :language: text
 
 Markdown under ``corpus/responses/`` is the source of truth. Jira is only a
 paste or one-shot comment target. For flags, TUI keys, and free REST details see
@@ -132,9 +115,12 @@ Reproduce this tutorial automatically
 
    cargo build --release --locked
    ./scripts/tutorial-run.sh ./target/release/canonic
+   # refresh the measured session block included above:
+   ./scripts/tutorial-run.sh --capture ./target/release/canonic
 
 The script drives the real binary against the included demos and exits non-zero
 if list, check, reindex, or search fail. Convert is asserted only when pandoc is
-on ``PATH``.
+on ``PATH``. ``--capture`` rewrites ``docs/source/_generated/tutorial-session.txt``
+so the tutorial page stays tied to measured CLI output (no hand-typed transcript).
 
 #+end_export

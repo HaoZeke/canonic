@@ -44,6 +44,7 @@ Walk the included demos from list through convert: **[docs/orgmode/tutorial.org]
 ```bash
 cargo build --release --locked
 ./scripts/tutorial-run.sh ./target/release/canonic
+./scripts/tutorial-run.sh --capture ./target/release/canonic  # refresh docs session
 ```
 
 ## Docs site (Shibuya)
