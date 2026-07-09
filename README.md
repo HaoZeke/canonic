@@ -7,23 +7,34 @@
   <img src="docs/source/_static/logo.svg" width="280" alt="canonic logo" />
 </p>
 
-**canonic** is a versioned **Jira canned-response** corpus tool: markdown under a **shared id prefix you choose** (`canonic.toml` / `--prefix` / `CANONIC_PREFIX`, default `resp`) is the source of truth. Convert with **pandoc**, enforce **quality checks**, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
+**canonic** is a versioned **Jira canned-response** corpus tool: markdown under a **shared id prefix you choose** in `canonic.toml` (optional `--prefix`; default `resp`) is the source of truth. Convert with **pandoc**, enforce **quality checks**, lint with **Vale** / **Harper**, and **search / dedupe** with a local **Tantivy** index (BM25).
 
 
 ## Configuration
 
-Shared library id prefix (front matter `prefix` and `{prefix}-*.md` filenames):
+Settings are layered with [figment](https://docs.rs/figment) (file-first, no app env vars):
+
+1. Built-in defaults (`prefix = "resp"`)
+2. `canonic.toml` (walk-up from the working directory)
+3. `canonic.local.toml` beside it (gitignored — tokens / machine overrides)
+4. CLI flags for one-shot overrides (`--config`, `--prefix`)
 
 ```toml
-# canonic.toml (repo root; walk-up discovery)
+# canonic.toml
 prefix = "resp"
+
+# Optional free Jira REST — put secrets in canonic.local.toml instead
+# [jira]
+# base_url = "https://your-instance.atlassian.net"
+# email = "you@example.org"
+# api_token = "..."
+# # auth_header = "Bearer <pat>"   # Server/DC alternative
 ```
 
-Override without editing the file:
-
 ```bash
-canonic --prefix acme check
-CANONIC_PREFIX=acme canonic new "Topic title"
+canonic check
+canonic --prefix acme new "Topic title"   # one-shot prefix override
+canonic --config /path/to/canonic.toml jira-probe
 ```
 
 ## Docs site (Shibuya)
@@ -167,14 +178,14 @@ canonic search "shared quota"
 canonic dedupe --reindex --threshold 1.0
 canonic dedupe --threshold 0.5 --json
 
-JIRA_BASE_URL=https://your-instance.atlassian.net JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
-  canonic import-jira "project = HSP AND labels = canned-response" --dry-run
+# with [jira] in canonic.local.toml:
+canonic import-jira "project = HSP AND labels = canned-response" --dry-run
 canonic promote corpus/imports/resp-some-topic-hsp-101.md
 ```
 
 | Command | Purpose |
 |---------|---------|
-| `doctor` | Tooling + optional Jira env probe |
+| `doctor` | Tooling + optional `[jira]` probe |
 | `tui` | Browse / filter / check / convert-preview (never posts to Jira) |
 | `list` / `new` / `promote` | Inventory, scaffold, import→responses after check |
 | `check` / `lint` | Quality gate + Harper (CI uses `--engine harper`) |
@@ -217,12 +228,12 @@ Mapped to **official Atlassian platform REST** (Cloud Free API tokens or Server/
 | `jira-probe` | `GET /rest/api/2/myself` (+ `serverInfo`) | Cloud + Server; reports wiki vs ADF write path |
 | `import-jira` | `GET …/search` (api/2, then api/3 + `/search/jql` fallback) · `GET …/issue/{key}/comment` (api/2 then 3) | Free-tier only; no Marketplace apps |
 | `jira-comment` | **Server/DC:** `POST /rest/api/2/issue/{key}/comment` wiki `{"body":"…"}` · **Cloud Free:** `POST /rest/api/3/issue/{key}/comment` minimal **ADF** body | Auto from host (`*.atlassian.net` → ADF) |
-| `doctor` | optional probe when `JIRA_BASE_URL` set | Non-critical; unset env is fine |
+| `doctor` | optional probe when `jira.base_url` set | Non-critical; unset env is fine |
 
 ```bash
 # Probe connectivity + identity
-JIRA_BASE_URL=https://your-instance.atlassian.net \
-JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
+jira.base_url=https://your-instance.atlassian.net \
+jira.email=you@example.org jira.api_token=... \
   canonic jira-probe
 
 # Import existing issue comments as review drafts (never auto-writes corpus/responses/)
@@ -239,12 +250,12 @@ canonic jira-comment --issue HSP-101 corpus/responses/resp-demo-shared-quota.md
 canonic jira-comment --issue HSP-101 PATH.md --body-format wiki   # force Server/DC
 canonic jira-comment --issue HSP-101 PATH.md --body-format adf    # force Cloud ADF
 # Server/DC PAT alternative to email+token:
-# export JIRA_AUTH_HEADER="Bearer <personal-access-token>"
+# export jira.auth_header="Bearer <personal-access-token>"
 ```
 
 - Import reads wiki **or** Cloud ADF comment bodies (ADF flattened to text, then pandoc `jira`→markdown when applicable).
 - Write is **one file → one issue comment**, human-gated — **not bulk library sync**.
-- `canonic doctor` reports free Jira status only when `JIRA_BASE_URL` is set (probe failure does not fail the critical path).
+- `canonic doctor` reports free Jira status only when `jira.base_url` is set (probe failure does not fail the critical path).
 
 Optional developer smoke (not required for normal install). Passwords in these scripts are **disposable fixture-only** defaults for local containers — never production credentials.
 
@@ -289,9 +300,9 @@ Official Atlassian Jira Software (heavy; needs several GB RAM, developer timebom
 
 Authentication reads from the environment:
 
-- `JIRA_BASE_URL` — required, e.g. `https://your-instance.atlassian.net`.
-- `JIRA_EMAIL` + `JIRA_API_TOKEN` — Basic auth (the Jira Cloud convention).
-- `JIRA_AUTH_HEADER` — a raw `Authorization` header instead, e.g. `Bearer <personal-access-token>` for Jira Server/Data Center. Takes precedence over `JIRA_EMAIL`/`JIRA_API_TOKEN` when set.
+- `jira.base_url` — required, e.g. `https://your-instance.atlassian.net`.
+- `jira.email` + `jira.api_token` — Basic auth (the Jira Cloud convention).
+- `jira.auth_header` — a raw `Authorization` header instead, e.g. `Bearer <personal-access-token>` for Jira Server/Data Center. Takes precedence over `jira.email`/`jira.api_token` when set.
 
 ### Doctor / check exit codes
 

@@ -2,9 +2,10 @@
 //!
 //! Spawns `scripts/jira-fixture/server.py` on an ephemeral port (no Marketplace
 //! apps). Drives the real `canonic` binary for probe, import, and comment write.
+//! Jira credentials come from a temp `canonic.toml` (file config, not env).
 
 use std::net::TcpListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -16,7 +17,6 @@ fn bin() -> PathBuf {
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
-
 
 fn health_ok(base: &str) -> bool {
     Command::new("curl")
@@ -34,6 +34,14 @@ fn free_port() -> u16 {
         .local_addr()
         .expect("local_addr")
         .port()
+}
+
+/// Write a temp canonic.toml with [jira] for the fixture (no env).
+fn write_jira_toml(path: &Path, base_url: &str) {
+    let text = format!(
+        "prefix = \"resp\"\n\n[jira]\nbase_url = \"{base_url}\"\nemail = \"advisor\"\napi_token = \"canonic-test\"\n"
+    );
+    std::fs::write(path, text).expect("write canonic.toml");
 }
 
 struct Fixture {
@@ -88,14 +96,15 @@ fn free_rest_probe_import_and_comment_via_fixture() {
     };
     let base = fx.base_url();
     let bin = bin();
+    let tmp = repo_root().join("target/test-tmp/jira-free-rest");
+    let _ = std::fs::create_dir_all(&tmp);
+    let cfg = tmp.join("canonic.toml");
+    write_jira_toml(&cfg, &base);
+    let cfg_s = cfg.to_str().unwrap();
 
     // Probe
     let out = Command::new(&bin)
-        .env("JIRA_BASE_URL", &base)
-        .env("JIRA_EMAIL", "advisor")
-        .env("JIRA_API_TOKEN", "canonic-test")
-        .env_remove("JIRA_AUTH_HEADER")
-        .args(["jira-probe"])
+        .args(["--config", cfg_s, "jira-probe"])
         .output()
         .expect("run jira-probe");
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -108,16 +117,12 @@ fn free_rest_probe_import_and_comment_via_fixture() {
     assert!(stdout.contains("Fixture Advisor") || stdout.contains("advisor"), "{stdout}");
 
     // Import dry-run
-    let tmp = repo_root().join("target/test-tmp/jira-free-rest");
-    let _ = std::fs::create_dir_all(&tmp);
     let out_dir = tmp.join("imports");
     let _ = std::fs::remove_dir_all(&out_dir);
     let out = Command::new(&bin)
-        .env("JIRA_BASE_URL", &base)
-        .env("JIRA_EMAIL", "advisor")
-        .env("JIRA_API_TOKEN", "canonic-test")
-        .env_remove("JIRA_AUTH_HEADER")
         .args([
+            "--config",
+            cfg_s,
             "import-jira",
             "project = HSP AND labels = canned-response",
             "--out",
@@ -133,11 +138,9 @@ fn free_rest_probe_import_and_comment_via_fixture() {
 
     // Real import
     let out = Command::new(&bin)
-        .env("JIRA_BASE_URL", &base)
-        .env("JIRA_EMAIL", "advisor")
-        .env("JIRA_API_TOKEN", "canonic-test")
-        .env_remove("JIRA_AUTH_HEADER")
         .args([
+            "--config",
+            cfg_s,
             "import-jira",
             "project = HSP AND labels = canned-response",
             "--out",
@@ -175,11 +178,9 @@ fn free_rest_probe_import_and_comment_via_fixture() {
     )
     .unwrap();
     let out = Command::new(&bin)
-        .env("JIRA_BASE_URL", &base)
-        .env("JIRA_EMAIL", "advisor")
-        .env("JIRA_API_TOKEN", "canonic-test")
-        .env_remove("JIRA_AUTH_HEADER")
         .args([
+            "--config",
+            cfg_s,
             "jira-comment",
             "--issue",
             "HSP-101",

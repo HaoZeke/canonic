@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use canonic::check::{check_corpus, format_check_report};
-use canonic::config::{load_config, resolve_prefix};
+use canonic::config::load_config;
 use canonic::convert::{convert_path_to_jira, tool_available as pandoc_available};
 use canonic::corpus::{default_corpus_dir, walk_responses};
 use canonic::doctor::{collect_statuses, critical_missing, format_doctor};
@@ -28,7 +28,7 @@ struct Cli {
     /// Path to canonic.toml (default: walk up from cwd for canonic.toml)
     #[arg(long, global = true)]
     config: Option<PathBuf>,
-    /// Shared response id prefix (overrides canonic.toml / CANONIC_PREFIX)
+    /// Shared response id prefix (overrides canonic.toml for this invocation)
     #[arg(long, global = true)]
     prefix: Option<String>,
     #[command(subcommand)]
@@ -201,8 +201,8 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
-    let file_cfg = load_config(cli.config.as_deref())?;
-    let prefix = resolve_prefix(cli.prefix.as_deref(), &file_cfg)?;
+    let file_cfg = load_config(cli.config.as_deref(), cli.prefix.as_deref())?;
+    let prefix = file_cfg.prefix.clone();
     match cli.command {
         Commands::Doctor => {
             let statuses = collect_statuses();
@@ -435,7 +435,7 @@ fn run() -> Result<ExitCode> {
             max_results,
             dry_run,
         } => {
-            let cfg = JiraConfig::from_env()?;
+            let cfg = JiraConfig::from_canonic(&file_cfg)?;
             let out_dir = out.unwrap_or_else(default_import_dir);
             let paths = import_jira(&cfg, &jql, &out_dir, max_results, dry_run, &prefix)?;
             let verb = if dry_run { "would import" } else { "imported" };
@@ -446,7 +446,7 @@ fn run() -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Commands::JiraProbe => {
-            let cfg = JiraConfig::from_env()?;
+            let cfg = JiraConfig::from_canonic(&file_cfg)?;
             let probe = probe_jira(&cfg)?;
             print!("{}", format_probe(&probe));
             Ok(ExitCode::SUCCESS)
@@ -457,7 +457,7 @@ fn run() -> Result<ExitCode> {
             dry_run,
             body_format,
         } => {
-            let cfg = JiraConfig::from_env()?;
+            let cfg = JiraConfig::from_canonic(&file_cfg)?;
             let format = CommentBodyFormat::from(body_format);
             let posted = post_comment_from_markdown_with_format(
                 &cfg, &issue, &path, dry_run, format,

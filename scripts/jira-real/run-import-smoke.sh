@@ -54,11 +54,28 @@ echo "==> pull/start $IMG"
   -e JVM_MAXIMUM_MEMORY=4096m \
   "$IMG" >/dev/null
 
-export JIRA_BASE_URL="http://127.0.0.1:${PORT}"
-export JIRA_EMAIL=admin
-export JIRA_API_TOKEN='CanonicAdmin!2026'
 # bootstrap sets admin CanonicAdmin!2026 + completes classic setup
-python3 "$ROOT/scripts/jira-real/bootstrap.py" "$JIRA_BASE_URL"
+
+# File-based Jira config (no JIRA_* env for canonic)
+CANONIC_CFG="${WORKDIR:-.}/canonic.toml"
+if [[ -n "${WORKDIR:-}" ]]; then
+  :
+elif [[ -n "${OUT:-}" ]]; then
+  CANONIC_CFG="$(dirname "$OUT")/canonic.toml"
+else
+  CANONIC_CFG="$(mktemp /tmp/canonic-XXXXXX.toml)"
+fi
+cat > "$CANONIC_CFG" <<TOML
+prefix = "resp"
+
+[jira]
+base_url = "http://127.0.0.1:${PORT}"
+email = "admin"
+api_token = "CanonicAdmin!2026"
+TOML
+CANONIC_ARGS=(--config "$CANONIC_CFG")
+
+python3 "$ROOT/scripts/jira-real/bootstrap.py" "http://127.0.0.1:${PORT}"
 # seed demo-shaped HSP issues (idempotent if already present)
 python3 "$ROOT/scripts/jira-real/seed_issues.py"
 
@@ -72,9 +89,9 @@ JQL='project = HSP AND labels = canned-response'
 mkdir -p "$OUT"
 
 echo "==> canonic dry-run"
-"$BIN" import-jira "$JQL" --out "$OUT" --dry-run
+"$BIN" "${CANONIC_ARGS[@]}" import-jira "$JQL" --out "$OUT" --dry-run
 echo "==> canonic import"
-"$BIN" import-jira "$JQL" --out "$OUT"
+"$BIN" "${CANONIC_ARGS[@]}" import-jira "$JQL" --out "$OUT"
 count=$(find "$OUT" -maxdepth 1 -name 'resp-*.md' | wc -l)
 [[ "$count" -eq 3 ]] || { echo "expected 3 drafts, got $count" >&2; exit 1; }
 ! find "$OUT" -name '*hsp-3*' | grep -q . || { echo "hsp-3 should be excluded" >&2; exit 1; }

@@ -54,14 +54,20 @@ echo "==> run $IMG on 127.0.0.1:${PORT}"
   -e CANONIC_JIRA_FIXTURE_PORT=8080 \
   "$IMG" >/dev/null
 
-export JIRA_BASE_URL="http://127.0.0.1:${PORT}"
-export JIRA_EMAIL=advisor
-export JIRA_API_TOKEN=canonic-test
-unset JIRA_AUTH_HEADER || true
+CFG="$(mktemp /tmp/canonic-ci-XXXXXX.toml)"
+cat > "$CFG" <<TOML
+prefix = "resp"
+
+[jira]
+base_url = "http://127.0.0.1:${PORT}"
+email = "advisor"
+api_token = "canonic-test"
+TOML
+trap 'rm -f "$CFG"' EXIT
 
 echo "==> wait for /health"
 for i in $(seq 1 60); do
-  if curl -sf "$JIRA_BASE_URL/health" >/dev/null; then
+  if curl -sf "http://127.0.0.1:${PORT}/health" >/dev/null; then
     break
   fi
   sleep 0.25
@@ -73,12 +79,12 @@ for i in $(seq 1 60); do
 done
 
 echo "==> jira-probe"
-"$BIN" jira-probe | tee /tmp/canonic-ci-jira-probe.log
+"$BIN" --config "$CFG" jira-probe | tee /tmp/canonic-ci-jira-probe.log
 grep -qi 'free REST\|jira: ok\|Fixture Advisor\|advisor' /tmp/canonic-ci-jira-probe.log
 
 OUT=$(mktemp -d)
 echo "==> import-jira"
-"$BIN" import-jira 'project = HSP AND labels = canned-response' --out "$OUT"
+"$BIN" --config "$CFG" import-jira 'project = HSP AND labels = canned-response' --out "$OUT"
 count=$(find "$OUT" -maxdepth 1 -name 'resp-*.md' | wc -l)
 [[ "$count" -ge 1 ]] || { echo "expected imports, got $count" >&2; exit 1; }
 
@@ -102,7 +108,7 @@ Support Team
 MD
 
 echo "==> jira-comment (wiki)"
-"$BIN" jira-comment --issue HSP-101 --body-format wiki "$MD" | tee /tmp/canonic-ci-jira-comment.log
+"$BIN" --config "$CFG" jira-comment --issue HSP-101 --body-format wiki "$MD" | tee /tmp/canonic-ci-jira-comment.log
 grep -qi 'posted comment' /tmp/canonic-ci-jira-comment.log
 
 echo "OK: jira docker fixture smoke passed (imports=$count)"

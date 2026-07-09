@@ -21,17 +21,21 @@ surface. Free platform REST only (Cloud Free API token or Server/DC PAT).
 - **Imports are drafts**: `import-jira` writes under `corpus/imports/` (or `--out`),
   never silently overwrites `corpus/responses/`.
 - **Promote only after review**: edit drafts, run `check`, then `promote`.
-- Secrets via env (`JIRA_BASE_URL`, `JIRA_EMAIL` + `JIRA_API_TOKEN`, or
-  `JIRA_AUTH_HEADER`). Never commit tokens.
+- Secrets in gitignored `canonic.local.toml` under `[jira]` (never commit tokens).
 
-## Env
+## Config (`canonic.toml` / `canonic.local.toml`)
 
-```bash
-export JIRA_BASE_URL=https://your-instance.atlassian.net   # or Server/DC base
-export JIRA_EMAIL=you@example.org
-export JIRA_API_TOKEN=...                                  # Cloud API token
+```toml
+# canonic.toml
+prefix = "resp"
+
+# canonic.local.toml (gitignored)
+[jira]
+base_url = "https://your-instance.atlassian.net"
+email = "you@example.org"
+api_token = "..."
 # Server/DC PAT alternative:
-# export JIRA_AUTH_HEADER="Bearer <pat>"
+# auth_header = "Bearer <pat>"
 ```
 
 ## Day-to-day loop
@@ -54,7 +58,7 @@ canonic import-jira "project = HSP AND labels = canned-response"
 Fixture smoke (no live Jira):
 
 ```bash
-# optional: scripts/jira-fixture/server.py + env pointing at it
+# optional: scripts/jira-fixture/server.py + [jira] in canonic.local.toml pointing at it
 canonic import-jira "project = HSP AND labels = canned-response" --out /tmp/imports
 ```
 

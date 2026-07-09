@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spin a disposable Jira REST v2 fixture (podman/docker), run canonic import-jira,
+# Spin a disposable Jira REST v2 fixture (podman/docker), run canonic "${CANONIC_ARGS[@]}" import-jira,
 # assert drafts, then tear everything down.
 #
 # Usage (repo root, preferably on a remote builder):
@@ -71,20 +71,29 @@ if [[ -z "$BIN" ]]; then
 fi
 test -x "$BIN"
 
-export JIRA_BASE_URL="http://127.0.0.1:${PORT}"
-export JIRA_EMAIL="advisor"
-export JIRA_API_TOKEN="canonic-test"
+# File-based Jira config for canonic (Basic auth against fixture)
+CANONIC_CFG="$WORKDIR/canonic.toml"
+cat > "$CANONIC_CFG" <<TOML
+prefix = "resp"
+
+[jira]
+base_url = "http://127.0.0.1:${PORT}"
+email = "advisor"
+api_token = "canonic-test"
+TOML
+CANONIC_ARGS=(--config "$CANONIC_CFG")
+
 JQL='project = HSP AND labels = canned-response'
 
 echo "==> free-tier jira-probe (myself + serverInfo)"
-PROBE_OUT="$("$BIN" jira-probe 2>&1)"
+PROBE_OUT="$("$BIN" "${CANONIC_ARGS[@]}" jira-probe 2>&1)"
 echo "$PROBE_OUT"
 echo "$PROBE_OUT" | grep -qi 'ok' || { echo "probe failed" >&2; exit 1; }
 echo "$PROBE_OUT" | grep -qi 'Fixture Advisor\|advisor' || { echo "probe missing identity" >&2; exit 1; }
 echo "$PROBE_OUT" | tee "$WORKDIR/jira-probe.log" >/dev/null
 
 echo "==> dry-run import (no files, no comments fetch for bodies)"
-DRY_OUT="$("$BIN" import-jira "$JQL" --out "$OUT" --dry-run 2>&1)"
+DRY_OUT="$("$BIN" "${CANONIC_ARGS[@]}" import-jira "$JQL" --out "$OUT" --dry-run 2>&1)"
 echo "$DRY_OUT"
 # draft ids embed lower-case issue keys: …-hsp-101.md
 echo "$DRY_OUT" | grep -q 'hsp-101' || { echo "dry-run missing hsp-101" >&2; exit 1; }
@@ -102,7 +111,7 @@ if compgen -G "$OUT"/*.md >/dev/null; then
 fi
 
 echo "==> real import (Basic auth)"
-"$BIN" import-jira "$JQL" --out "$OUT" --max-results 50 2>&1 | tee "$WORKDIR/import-basic.log"
+"$BIN" "${CANONIC_ARGS[@]}" import-jira "$JQL" --out "$OUT" --max-results 50 2>&1 | tee "$WORKDIR/import-basic.log"
 mapfile -t MDS < <(find "$OUT" -maxdepth 1 -name 'resp-*.md' | sort)
 echo "wrote ${#MDS[@]} drafts"
 [[ "${#MDS[@]}" -eq 3 ]] || { echo "expected 3 drafts, got ${#MDS[@]}" >&2; ls -la "$OUT"; exit 1; }
@@ -121,11 +130,16 @@ done
 # personal sign-off still present in draft (review-before-migrate: human must fix)
 grep -qi 'alice' "$OUT"/resp-*-hsp-101.md
 
-echo "==> Bearer PAT auth path"
+echo "==> Bearer PAT auth path (auth_header in config)"
 rm -f "$OUT"/*.md
-unset JIRA_EMAIL JIRA_API_TOKEN
-export JIRA_AUTH_HEADER="Bearer pat-canonic-fixture-token"
-"$BIN" import-jira "$JQL" --out "$OUT" 2>&1 | tee "$WORKDIR/import-bearer.log"
+cat > "$CANONIC_CFG" <<TOML
+prefix = "resp"
+
+[jira]
+base_url = "http://127.0.0.1:${PORT}"
+auth_header = "Bearer pat-canonic-fixture-token"
+TOML
+"$BIN" "${CANONIC_ARGS[@]}" import-jira "$JQL" --out "$OUT" 2>&1 | tee "$WORKDIR/import-bearer.log"
 [[ "$(find "$OUT" -maxdepth 1 -name 'resp-*.md' | wc -l)" -eq 3 ]]
 
 echo "==> convert one draft body path sanity (pandoc jira writer available)"
@@ -152,17 +166,22 @@ grep -qi 'self-service\|self service\|[*]self-service[*]' "$WORKDIR/smoke.jira" 
   || grep -q 'backup' "$WORKDIR/smoke.jira"
 
 echo "==> free write: jira-comment dry-run (pandoc wiki, no POST)"
-# re-auth basic for write path
-unset JIRA_AUTH_HEADER
-export JIRA_EMAIL="advisor"
-export JIRA_API_TOKEN="canonic-test"
-DRY_CMT="$("$BIN" jira-comment --issue HSP-101 --dry-run "$SAMPLE" 2>&1)"
+# restore Basic auth for write path
+cat > "$CANONIC_CFG" <<TOML
+prefix = "resp"
+
+[jira]
+base_url = "http://127.0.0.1:${PORT}"
+email = "advisor"
+api_token = "canonic-test"
+TOML
+DRY_CMT="$("$BIN" "${CANONIC_ARGS[@]}" jira-comment --issue HSP-101 --dry-run "$SAMPLE" 2>&1)"
 echo "$DRY_CMT" | tee "$WORKDIR/jira-comment-dry.log"
 echo "$DRY_CMT" | grep -qi 'would post' || { echo "dry-run comment missing would post" >&2; exit 1; }
 echo "$DRY_CMT" | grep -qi 'self-service\|backup\|Smoke\|h1' || { echo "dry-run body not from convert" >&2; exit 1; }
 
 echo "==> free write: jira-comment POST on HSP-101"
-"$BIN" jira-comment --issue HSP-101 "$SAMPLE" 2>&1 | tee "$WORKDIR/jira-comment-write.log"
+"$BIN" "${CANONIC_ARGS[@]}" jira-comment --issue HSP-101 "$SAMPLE" 2>&1 | tee "$WORKDIR/jira-comment-write.log"
 grep -qi 'posted comment' "$WORKDIR/jira-comment-write.log"
 
 echo ""

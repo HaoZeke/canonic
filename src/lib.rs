@@ -29,10 +29,11 @@
 //! ```
 //!
 //! Markdown under `corpus/responses/` remains the source of truth. The shared
-//! id prefix is **user-chosen** (`canonic.toml` `prefix`, `--prefix`, or
-//! `CANONIC_PREFIX`; default `resp`). Jira is a publication surface: convert
-//! for paste-in, import only as drafts under `corpus/imports/`, then
-//! [`scaffold::promote_to_corpus`] after review.
+//! id prefix is **user-chosen** in `canonic.toml` (optional `--prefix` CLI
+//! override; default `resp`). Jira settings live under `[jira]` in the same
+//! files (prefer `canonic.local.toml` for tokens). Jira is a publication
+//! surface: convert for paste-in, import only as drafts under
+//! `corpus/imports/`, then [`scaffold::promote_to_corpus`] after review.
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/mark.svg")]
 #![doc(html_favicon_url = "https://raw.githubusercontent.com/HaoZeke/canonic/main/docs/source/_static/favicon.svg")]
@@ -51,7 +52,7 @@ pub mod tui;
 pub use check::{check_corpus, check_responses, format_check_report, CheckReport};
 pub use config::{
     find_config_path, load_config, load_config_file, normalize_prefix, resolve_prefix,
-    CanonicConfig, DEFAULT_PREFIX,
+    CanonicConfig, JiraSettings, DEFAULT_PREFIX,
 };
 pub use convert::{
     convert_jira_to_markdown, convert_markdown_to_jira, convert_path_to_jira,

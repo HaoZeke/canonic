@@ -56,18 +56,55 @@ impl JiraConfig {
         }
     }
 
-    /// Read `JIRA_BASE_URL` plus either `JIRA_AUTH_HEADER` (a raw `Authorization`
-    /// value) or `JIRA_EMAIL` + `JIRA_API_TOKEN` (Basic auth).
-    pub fn from_env() -> Result<Self> {
-        let base_url = std::env::var("JIRA_BASE_URL")
-            .context("JIRA_BASE_URL is not set (e.g. https://your-instance.atlassian.net)")?;
-        if let Ok(header) = std::env::var("JIRA_AUTH_HEADER") {
-            return Ok(Self::new(base_url, JiraAuth::Header(header)));
+    /// Build from `[jira]` settings in `canonic.toml` / `canonic.local.toml`.
+    pub fn from_settings(jira: &crate::config::JiraSettings) -> Result<Self> {
+        let base_url = jira
+            .base_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "jira.base_url is not set in canonic.toml (or canonic.local.toml); \
+                     example: base_url = \"https://your-instance.atlassian.net\""
+                )
+            })?
+            .trim_end_matches('/')
+            .to_string();
+        if let Some(header) = jira
+            .auth_header
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            return Ok(Self::new(base_url, JiraAuth::Header(header.to_string())));
         }
-        let user = std::env::var("JIRA_EMAIL")
-            .context("set JIRA_AUTH_HEADER, or JIRA_EMAIL + JIRA_API_TOKEN")?;
-        let token = std::env::var("JIRA_API_TOKEN").context("JIRA_API_TOKEN is not set")?;
+        let user = jira
+            .email
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "set jira.auth_header, or jira.email + jira.api_token in canonic.toml / canonic.local.toml"
+                )
+            })?
+            .to_string();
+        let token = jira
+            .api_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                anyhow::anyhow!("jira.api_token is not set in canonic.toml / canonic.local.toml")
+            })?
+            .to_string();
         Ok(Self::new(base_url, JiraAuth::Basic { user, token }))
+    }
+
+    /// Convenience: extract Jira settings from a full [`crate::config::CanonicConfig`].
+    pub fn from_canonic(cfg: &crate::config::CanonicConfig) -> Result<Self> {
+        Self::from_settings(&cfg.jira)
     }
 }
 
@@ -594,7 +631,7 @@ pub fn probe_jira(cfg: &JiraConfig) -> Result<JiraProbe> {
     let resp = client.execute(req).context("send /myself request")?;
     if !resp.status().is_success() {
         bail!(
-            "Jira probe failed (auth or reachability): HTTP {} on /rest/api/2/myself — free Cloud needs email+API token; Server/DC may use JIRA_AUTH_HEADER",
+            "Jira probe failed (auth or reachability): HTTP {} on /rest/api/2/myself — free Cloud needs jira.email+api_token; Server/DC may use jira.auth_header",
             resp.status()
         );
     }
@@ -940,11 +977,11 @@ mod tests {
     }
 
     #[test]
-    fn from_env_requires_base_url() {
-        // Isolated by variable name; does not touch real Jira config.
-        std::env::remove_var("JIRA_BASE_URL");
-        let err = JiraConfig::from_env().unwrap_err().to_string();
-        assert!(err.contains("JIRA_BASE_URL"));
+    fn from_settings_requires_base_url() {
+        let err = JiraConfig::from_settings(&crate::config::JiraSettings::default())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("base_url"), "{err}");
     }
 
     const MYSELF_FIXTURE: &str = r#"{

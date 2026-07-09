@@ -73,24 +73,34 @@ pub fn collect_statuses() -> Vec<ToolStatus> {
         },
     });
 
-    // Optional free-tier Jira: only when env is configured (never fails doctor critical).
-    out.push(jira_env_status());
+    // Optional free-tier Jira: only when [jira] is configured in canonic.toml.
+    out.push(jira_config_status());
 
     out
 }
 
-/// Report free Jira env + quick probe when `JIRA_BASE_URL` is set.
-fn jira_env_status() -> ToolStatus {
-    if std::env::var_os("JIRA_BASE_URL").is_none() {
+/// Report free Jira settings from canonic.toml + optional live probe.
+fn jira_config_status() -> ToolStatus {
+    let cfg = match crate::config::load_config(None, None) {
+        Ok(c) => c,
+        Err(e) => {
+            return ToolStatus {
+                name: "jira".into(),
+                present: false,
+                detail: format!("config load failed: {e:#}"),
+            };
+        }
+    };
+    if !cfg.jira.is_configured() {
         return ToolStatus {
             name: "jira".into(),
             present: false,
-            detail: "JIRA_BASE_URL unset (optional; set for jira-probe / import-jira / jira-comment)"
+            detail: "[jira] unset in canonic.toml / canonic.local.toml (optional for jira-probe / import-jira / jira-comment)"
                 .into(),
         };
     }
-    match crate::jira_import::JiraConfig::from_env() {
-        Ok(cfg) => match crate::jira_import::probe_jira(&cfg) {
+    match crate::jira_import::JiraConfig::from_canonic(&cfg) {
+        Ok(jira) => match crate::jira_import::probe_jira(&jira) {
             Ok(probe) => {
                 let fmt = match probe.comment_format {
                     crate::jira_import::CommentBodyFormat::Adf => "ADF/v3",
@@ -109,13 +119,13 @@ fn jira_env_status() -> ToolStatus {
             Err(e) => ToolStatus {
                 name: "jira".into(),
                 present: false,
-                detail: format!("JIRA_BASE_URL set but probe failed: {e:#}"),
+                detail: format!("[jira] configured but probe failed: {e:#}"),
             },
         },
         Err(e) => ToolStatus {
             name: "jira".into(),
             present: false,
-            detail: format!("Jira env incomplete: {e:#}"),
+            detail: format!("[jira] incomplete: {e:#}"),
         },
     }
 }
@@ -144,13 +154,7 @@ mod tests {
 
     #[test]
     fn doctor_names_pandoc_vale_and_harper() {
-        // Isolate optional Jira probe from ambient builder env.
-        let prev = std::env::var_os("JIRA_BASE_URL");
-        std::env::remove_var("JIRA_BASE_URL");
         let statuses = collect_statuses();
-        if let Some(v) = prev {
-            std::env::set_var("JIRA_BASE_URL", v);
-        }
         let names: Vec<_> = statuses.iter().map(|s| s.name.as_str()).collect();
         assert!(names.contains(&"pandoc"), "{names:?}");
         assert!(names.contains(&"vale"), "{names:?}");

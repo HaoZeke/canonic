@@ -228,10 +228,20 @@ The filename is ``resp-`` plus a slug of the title (override with ``--id``).
 
 **Import → edit → promote**
 
+Put free Jira settings in ``canonic.local.toml`` (gitignored) or ``canonic.toml``:
+
+.. code:: toml
+
+   # canonic.local.toml
+   [jira]
+   base_url = "https://your-instance.atlassian.net"
+   email = "you@example.org"
+   api_token = "..."
+   # Server/DC alternative:
+   # auth_header = "Bearer <pat>"
+
 .. code:: shell
 
-   export JIRA_BASE_URL=https://your-instance.atlassian.net
-   export JIRA_EMAIL=you@example.org JIRA_API_TOKEN=...
    canonic jira-probe
    canonic import-jira "project = HSP AND labels = canned-response" --dry-run
    canonic import-jira "project = HSP AND labels = canned-response"
@@ -282,9 +292,8 @@ Full paste-ready session
    canonic search "shared quota"
    canonic dedupe --reindex --threshold 1.0
 
-   JIRA_BASE_URL=https://your-instance.atlassian.net \
-   JIRA_EMAIL=you@example.org JIRA_API_TOKEN=... \
-     canonic jira-probe
+   # with [jira] in canonic.local.toml:
+   canonic jira-probe
    canonic import-jira "project = HSP AND labels = canned-response" --dry-run
    canonic promote corpus/imports/resp-example-hsp-101.md
    canonic jira-comment --issue HSP-101 \
@@ -401,17 +410,17 @@ converted wiki without POSTing. One file, one issue, human-gated — not bulk sy
 | ``jira-comment`` | ``POST …/comment`` (v2 wiki / v3 ADF)        | pandoc jira text |
 +------------------+----------------------------------------------+------------------+
 
-**Authentication (environment):**
+**Authentication (`[jira]` in canonic.toml / canonic.local.toml):**
 
 +------------------------+--------------------------------------------------+
-| Variable               | Role                                             |
+| Key                    | Role                                             |
 +========================+==================================================+
-| ``JIRA_BASE_URL``      | Required, e.g. Cloud Free instance URL           |
+| ``base_url``           | Required, e.g. Cloud Free instance URL           |
 +------------------------+--------------------------------------------------+
-| ``JIRA_EMAIL`` +       | Basic auth (Jira Cloud Free API token)           |
-| ``JIRA_API_TOKEN``     |                                                  |
+| ``email`` +            | Basic auth (Jira Cloud Free API token)           |
+| ``api_token``          |                                                  |
 +------------------------+--------------------------------------------------+
-| ``JIRA_AUTH_HEADER``   | Raw ``Authorization`` header; wins if set        |
+| ``auth_header``        | Raw ``Authorization`` header; wins if set        |
 |                        | (e.g. ``Bearer …`` for Server/DC)                |
 +------------------------+--------------------------------------------------+
 

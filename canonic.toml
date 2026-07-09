@@ -1,3 +1,12 @@
 # Shared library id prefix. Response files are `{prefix}-{slug}.md` with
-# front matter `prefix: <same>`. Override with `--prefix` or `CANONIC_PREFIX`.
+# front matter `prefix: <same>`. Override for one invocation with `--prefix`.
 prefix = "resp"
+
+# Free-tier Jira REST (optional). Prefer secrets in gitignored canonic.local.toml:
+#
+#   [jira]
+#   base_url = "https://your-instance.atlassian.net"
+#   email = "you@example.org"
+#   api_token = "..."
+#   # Or Server/DC:
+#   # auth_header = "Bearer <pat>"

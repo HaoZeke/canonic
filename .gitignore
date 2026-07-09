@@ -28,3 +28,6 @@ docs/source/**/*.rst
 /tmp/
 canonic-jira-*
 /result
+
+# Local secrets / machine overrides (figment layer on canonic.toml)
+canonic.local.toml

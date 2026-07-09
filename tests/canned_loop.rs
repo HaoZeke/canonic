@@ -256,22 +256,23 @@ fn import_fixture_then_promote_edited_draft() {
     fs::create_dir_all(&responses).unwrap();
 
     let base = fx.base_url();
-    let envs = [
-        ("JIRA_BASE_URL", base.as_str()),
-        ("JIRA_EMAIL", "advisor"),
-        ("JIRA_API_TOKEN", "canonic-test"),
-    ];
-    // Avoid inheriting a real AUTH_HEADER from the builder host.
+    let cfg_path = root.join("canonic.toml");
+    fs::write(
+        &cfg_path,
+        format!(
+            "prefix = \"resp\"\n\n[jira]\nbase_url = \"{base}\"\nemail = \"advisor\"\napi_token = \"canonic-test\"\n"
+        ),
+    )
+    .unwrap();
     let mut cmd = Command::new(bin());
-    cmd.current_dir(repo_root())
-        .env_remove("JIRA_AUTH_HEADER")
-        .envs(envs.iter().copied())
-        .args([
-            "import-jira",
-            "project = HSP AND labels = canned-response",
-            "--out",
-            imports.to_str().unwrap(),
-        ]);
+    cmd.current_dir(repo_root()).args([
+        "--config",
+        cfg_path.to_str().unwrap(),
+        "import-jira",
+        "project = HSP AND labels = canned-response",
+        "--out",
+        imports.to_str().unwrap(),
+    ]);
     let out = cmd.output().expect("import-jira");
     assert!(
         out.status.success(),
