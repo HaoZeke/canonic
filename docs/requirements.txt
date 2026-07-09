@@ -4,4 +4,6 @@ shibuya>=2024.1.0
 sphinx-design>=0.6,<1
 sphinx-copybutton>=0.5.2,<1
 sphinxcontrib-rust>=1,<2
-sphinx-rustdoc-postprocess>=0.1,<0.2
+# 0.1.1+: preserves :rust:any:`path` re-export roles (inline-code conversion)
+# Pin VCS until PyPI 0.1.1 is published from a reachable network.
+sphinx-rustdoc-postprocess @ git+https://github.com/HaoZeke/sphinx-rustdoc-postprocess.git@v0.1.1
