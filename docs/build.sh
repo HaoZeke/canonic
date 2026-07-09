@@ -16,16 +16,20 @@ BUILD="$ROOT/docs/build"
 DOCS="$ROOT/docs"
 
 if [[ "${CANONIC_SKIP_ORG_EXPORT:-0}" != "1" ]]; then
-  echo "==> 0/3 orgmode → RST (emacs ox-rst)"
-  if ! command -v emacs >/dev/null 2>&1; then
-    echo "error: emacs required to export docs/orgmode → docs/source/*.rst" >&2
-    echo "       install emacs, or set CANONIC_SKIP_ORG_EXPORT=1 if RST already present" >&2
-    exit 1
+  echo "==> 0/3 orgmode → RST"
+  exported=0
+  if command -v emacs >/dev/null 2>&1; then
+    echo "    try emacs ox-rst (export.el)"
+    if ( cd "$DOCS" && emacs --batch --load export.el ); then
+      exported=1
+    else
+      echo "    emacs export failed; falling back to docs/mkrst.py" >&2
+    fi
   fi
-  (
-    cd "$DOCS"
-    emacs --batch --load export.el
-  )
+  if [[ "$exported" -ne 1 ]]; then
+    echo "    docs/mkrst.py (extract #+begin_export rst blocks)"
+    python3 "$DOCS/mkrst.py"
+  fi
 else
   echo "==> 0/3 skip org export (CANONIC_SKIP_ORG_EXPORT=1)"
 fi

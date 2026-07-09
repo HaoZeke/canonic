@@ -11,6 +11,7 @@
   (package-refresh-contents)
   (package-install 'org))
 (require 'org)
+(require 'org-element)
 (unless (fboundp 'org-element-type-p)
   (error "Org still lacks org-element-type-p after ELPA install; got Org %s"
          (org-version)))
