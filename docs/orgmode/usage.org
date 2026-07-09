@@ -121,7 +121,7 @@ Command map (cards)
 .. grid:: 1 2 2 2
    :gutter: 2
 
-   .. grid-item-card:: Environment &amp; corpus
+   .. grid-item-card:: Environment and corpus
       :class-card: sd-border-0
 
       .. raw:: html
@@ -134,7 +134,7 @@ Command map (cards)
            <li>canonic lint --engine harper</li>
          </ul>
 
-   .. grid-item-card:: Author &amp; promote
+   .. grid-item-card:: Author and promote
       :class-card: sd-border-0
 
       .. raw:: html
@@ -144,7 +144,7 @@ Command map (cards)
            <li>canonic promote PATH.md<span class="cn-cmd-hint">import → responses after check</span></li>
          </ul>
 
-   .. grid-item-card:: Search &amp; dedupe
+   .. grid-item-card:: Search and dedupe
       :class-card: sd-border-0
 
       .. raw:: html
@@ -156,7 +156,7 @@ Command map (cards)
            <li>canonic dedupe --threshold 0.5 --json</li>
          </ul>
 
-   .. grid-item-card:: Convert &amp; free Jira
+   .. grid-item-card:: Convert and free Jira
       :class-card: sd-border-0
 
       .. raw:: html
