@@ -4,13 +4,16 @@
 (add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
 (package-initialize)
 
-;; Ubuntu emacs-nox ships an older Org that lacks helpers MELPA ox-rst needs
-;; (e.g. org-element-type-p). Install current Org from GNU ELPA first.
-(unless (package-installed-p 'org)
+;; Ubuntu emacs-nox ships Org 9.6.x without helpers MELPA ox-rst needs
+;; (e.g. org-element-type-p). The distro package counts as "installed", so
+;; always refresh and install Org from GNU ELPA when the symbol is missing.
+(unless (fboundp 'org-element-type-p)
   (package-refresh-contents)
   (package-install 'org))
-;; Prefer ELPA Org over the bundled one.
 (require 'org)
+(unless (fboundp 'org-element-type-p)
+  (error "Org still lacks org-element-type-p after ELPA install; got Org %s"
+         (org-version)))
 
 ;; Ensure ox-rst is present
 (unless (package-installed-p 'ox-rst)
